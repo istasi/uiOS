@@ -4,6 +4,7 @@ local pairs,ipairs,type = pairs,ipairs,type
 local insert,remove = table.insert,table.remove
 local tostring = tostring
 
+
 local myAddress = computer.getBootAddress ()
 local gpu = clist ( 'gpu',true ) ()
 screen = clist ( 'screen',true ) ()
@@ -12,8 +13,10 @@ cinvoke ( gpu, 'setBackground', 0x000000 )
 cinvoke ( gpu, 'setForeground', 0xFFFFFF )
 local size = ({cinvoke ( gpu, 'getResolution' )})
 
+
 local function clear () cinvoke ( gpu, 'fill', 1,1, size [1],size[2], ' ' ) end
 clear ()
+
 
 local status = {
 	['bar'] = {
@@ -94,7 +97,7 @@ local function download ( url, _file )
 	local internet = clist ( 'internet' ) ()
 	if internet == nil then return false end
 
-	local urlHandle = cinvoke ( internet, 'request', url .. '?raw&1' )
+	local urlHandle = cinvoke ( internet, 'request', url .. (urlOpts or '') )
 
 	local content = ''
 	local continue = true
