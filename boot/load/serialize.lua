@@ -1,5 +1,8 @@
--- Lazy depth fix
+local rep = string.rep
+--local pairs, ipairs = pairs, ipairs
+local tostring, tonumber = tostring, tonumber
 
+-- Lazy depth fix
 local serialize = {}
 function serialize.pack ( _table, level, pretty )
 	level = level or 0
@@ -33,11 +36,12 @@ function serialize.pack ( _table, level, pretty )
 		str = str .. n
 	end
 
-	return str .. string.rep (t, level) .. '}'
+	return str .. rep (t, level) .. '}'
 end
 
 function serialize.unpack ( str )
 	local _table = {}
+	if str == nil then return {} end
 
 	if str:match ('^%{.*%}[ \r\n]*$') == nil then
 		return false, 'not a valid string supplied.'

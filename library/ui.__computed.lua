@@ -3,8 +3,7 @@ return function ( self, key )
 		error ( 'ui.element:__computed (), self is missing, or not of type ui.element' )
 	end
 
-
-	if key == 'visibility' then
+		if key == 'visibility' then
 		if self:attr('visibility') == 'hidden' then
 			return 'hidden'
 		else
@@ -15,35 +14,43 @@ return function ( self, key )
 			end
 		end
 
-	elseif self.style [key] ~= nil then
+	elseif self:attr (key) ~= nil then
 		local o = self:attr (key)
-		if o == 'inherit' or o == 'transparent' then
+		if o == nil or o == 'inherit' or o == 'transparent' then
 			if self.parent ~= nil then
 				o = self.parent:__computed (key)
 			else
+				local result = self.style.default ( key )
+				if result ~= nil then return result end
+
 				if key == 'background-color' then
-					o = 0x000000
+					return 0x000000
 				elseif key == 'color' then
-					o = 0xFFFFFF
+					return 0xFFFFFF
 				end
 			end
 		end
 
 		return o
 	elseif key == 'XY' then
+		
+
 		if self.parent == nil or self:attr ('position') == 'absolute' then
 			local x = self:attr ('x')
-			if tostring(x) == nil then x = 1 end
+			if tostring(x) == nil or x == nil then x = 1 end
 
 			local y = self:attr ('y')
-			if tonumber(y) == nil then y = 1 end
+			if tonumber(y) == nil or y == nil then y = 1 end
+
 
 			return x,y
 		end
 
+
 		local x,y = self.parent:__computed ('XY')
 		local offsetX = 0
 		local offsetY = 0
+
 
 		if self:attr ('position') == 'relative' then
 			offsetX,offsetY = tonumber(self:attr ('x')) or 1, tonumber(self:attr ('y')) or 1
@@ -179,8 +186,10 @@ return function ( self, key )
 						end
 					end
 
-					local _,maxY = calcAlign ( last )
-					offsetY = (self.parent:__computed ('height') - maxY) + (offsetY - 1)
+					if last ~= nil then
+						local _,maxY = calcAlign ( last )
+						offsetY = (self.parent:__computed ('height') - maxY) + (offsetY - 1)
+					end
 				elseif valign == 'center' then
 					local last = self.parent.children [1]
 					for _,child in ipairs ( self.parent.children ) do
@@ -189,8 +198,10 @@ return function ( self, key )
 						end
 					end
 
-					local _,maxY = calcAlign ( last )
-					offsetY = (self.parent:__computed ('height') / 2) - (maxY / 2) + offsetY
+					if last ~= nil then
+						local _,maxY = calcAlign ( last )
+						offsetY = (self.parent:__computed ('height') / 2) - (maxY / 2) + offsetY
+					end
 				end
 			end
 		end

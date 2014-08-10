@@ -137,10 +137,11 @@ zone = {
 		table.insert ( map, o )
 		return o
 	end,
-	['get'] = function ( x, y )
+	['get'] = function ( x, y, start )
 		if x == nil or y == nil then error ( 'zone.get (), x or y is missing.' ) end
 
-		for i = #map, 0, -1 do
+		start = start or #map
+		for i = start, 0, -1 do
 			local element = map[i]
 
 			if element ~= nil then
@@ -158,6 +159,7 @@ zone = {
 
 					if x >= element.relation.x + element.x - 1 and x <= element.relation.x + element.x + element.width then
 						if y >= elment.relation.y + element.y - 1 and y <= element.relation.y + element.y + element.height then
+							element.__zIndex = i
 							return element
 						end
 					end
@@ -166,9 +168,7 @@ zone = {
 					if element.x == nil then
 						error ( tostring(element.values.name) )
 					end
-					if x >= 
-						element.x 
-						and x <= element.x + element.width - 1 then
+					if x >= element.x and x <= element.x + element.width - 1 then
 						if y >= element.y and y <= element.y + element.height - 1 then
 							return element
 						end

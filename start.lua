@@ -1,5 +1,5 @@
 _G['system'] = {}
-system.event = eventHandler:create ()
+system.event = eventHandler:create ('system')
 system.filesystem = filesystem
 system.serialize = serialize
 system.unicode = unicode
@@ -10,12 +10,21 @@ serialize = nil
 unicode = nil
 environment = nil
 
-system.environment.remove (filesystem)
-system.environment.remove (eventHandler)
-system.environment.remove (serialize)
-system.environment.remove (unicode)
-system.environment.remove (component)
+system.environment.remove ('filesystem')
+system.environment.remove ('eventHandler')
+system.environment.remove ('serialize')
+system.environment.remove ('unicode')
+system.environment.remove ('component')
+system.environment.set ( '_G', {} )
 
+eventHandler.__environment = system.environment.base ()
+
+
+function print ( message )
+	message = tostring(message)
+	component.invoke ( component.list('gpu')(), 'copy', 1, 1, 160,50, 0, 1 )
+	component.invoke ( component.list('gpu')(), 'set', 1, 1, message .. string.rep ( ' ', 160 - message:len () ) )
+end
 
 function loadfile ( _file, mode, env )
 	if type(_file) ~= 'string' then error ( 'loadfile (), #1 argument should be a string path toa file' ) end
@@ -40,8 +49,10 @@ function dofile ( _file, mode, env )
 
 	return result
 end
+
 system.environment.set ( 'dofile', dofile )
 system.environment.set ( 'loadfile', loadfile )
+system.environment.set ( 'class', 'lcs' )
 
 if system.filesystem.exists ('/log/') == false then
 	system.filesystem.makeDirectory ('/log/')
@@ -51,10 +62,10 @@ end
 system.config 	= dofile ('/library/config.lua')
 system.gpu 		= dofile ('/library/gpu.lua')
 system.screens 	= dofile ('/library/difference.lua') -- Wonder if this one even saves me anything?, it seemed like a great idea in my mind, i wonder i wonder.
-system.screens:setDefault ( dofile ('/library/screen.lua') )
+system.screens:setDefault (dofile ('/library/screen.lua'))
 
 system.event:timer (0, function ()
-	system.event:on ( 'component_added', function ( _, address, _type )
+	system.event:on ( 'component_added', function ( e, address, _type )
 		if _type ~= 'screen' then return end
 
 		local i = false
@@ -74,6 +85,8 @@ system.event:timer (0, function ()
 
 
 	system.event:on ( 'component_added', function ( _, address, _type ) 
+		
+
 		if _type ~= 'gpu' then return end
 		system.gpu:addGPU (address)
 	end )
@@ -88,15 +101,19 @@ system.event:timer (0, function ()
 
 
 	if system.config.screens == nil then system.config.screens = {} end
-	system.event:on ( 'screen_added', function ( _, id )
+	system.event:on ( 'screen_added', function ( e, id )
 		local o = {}
 		for k,v in pairs (system) do o[k]=v end
-		o.event = system.event:create ()
+		o.event = system.event:create ('desktop: ' .. system.screens[id].address )
 
 		system.config.screens [system.screens[id].address] = dofile ('/system/buildDesktop.lua', 't', system.environment.base ({
 			['system'] = o,
 			['id'] = id,
 		}) )
+
+		e:interval (1, function ()
+			system.screens[id]:set ( 1,2, tostring ( (computer.totalMemory () - computer.freeMemory ()) / 1024 ) .. 'KB' )
+		end )
 	end )
 
 	system.event:on ( 'screen_reconnect', function ( _, id )
@@ -108,8 +125,14 @@ system.event:timer (0, function ()
 	end )
 end )
 
-system.event:on ( 'error', function ( _, _, message ) 
-	system.event:push ( 'event-handler.stop', message )
+system.event:on ( 'error', function ( event, message )
+	component.invoke ( component.list('gpu') (), 'set', 4,4, 'system event recieved error: ' .. tostring(message) )
+	while  true do computer.pullSignal () end
+
+	event:signal ( 1, 'process.error', tostring(message) )
+	event:destroy ()
 end )
+--system.event.__registered ['error'][1]['func'] ( system.event, 'test error' )
+
 
 return eventHandler.handle ()

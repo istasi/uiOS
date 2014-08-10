@@ -1,8 +1,11 @@
 local o = {
 	['element'] = __ui:create ('system.bar'),
 
-	['create'] = function ( self )
-		return c(self.element)
+	['create'] = function ( self, name )
+		local o = c(self.element)
+		o.name = name
+		
+		return o
 	end
 }
 
@@ -58,14 +61,15 @@ element ['create'] = function ( self, name )
 	
 
 	child:on ('touch', function ( ui, e, x,y, button )
-		if ui:search('window'):attr ('visibility') == 'hidden' then
-			ui:root ():search(':type(ui.element.system.bar.object.window)'):attr ('visibility', 'hidden')
+		if ui:search('window') [1]:attr ('visibility') == 'hidden' then
+			ui.parent:search(':type(ui.element.system.bar.object.window)'):each ( function ( ui ) ui:attr ('visibility', 'hidden') end )
 
-			ui:search('window'):attr ('visibility','visible')
+			ui:search('window') [1]:attr ('visibility','visible')
 		else
-			ui:search('window'):attr ('visibility','hidden')
+			ui:search('window') [1]:attr ('visibility','hidden')
 		end
-		ui:root():draw ()
+
+		ui.parent.parent:draw ()
 	end)
 	
 	return child

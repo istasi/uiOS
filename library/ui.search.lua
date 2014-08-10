@@ -8,15 +8,21 @@ return function ( self, query )
 
 	local o = {}
 	for _,child in ipairs ( self.children ) do
-		if query:match (':type%(.-%)$') then
+		if query == '*' then
+			table.insert ( o, child )
+
+		elseif query:match (':type%(.-%)$') then
 			local match = query:match (':type%((.-)%)$')
 			if child.type == match then
 				table.insert ( o, child )
 			end
+
 		elseif query == ':has(zone)' and child.__zone ~= nil then
 			table.insert ( o, child )
+
 		elseif child.name == query then
 			table.insert ( o, child )
+			
 		end
 
 		local _o = child:search ( query )
@@ -25,25 +31,16 @@ return function ( self, query )
 		end
 	end
 
-	o.n = #o
-	return setmetatable (o, {		-- to enable the syntax of :search ('program'):attr ( 'background-color', '0x000000' ) despite returning a table with posible multiply elements
-		['__index'] = function ( self, key )
-			if o.n < 1 then return nil end
+	o ['each'] = function ( self, callback )
+		local continue = true
 
-			if type(o[1][key]) == 'function' then
-				return function ( ... )
-					local args = {...}
-					table.remove ( args, 1 )
-
-					for _,element in ipairs (self) do
-						local r = element [key] ( element, table.unpack ( args ) )
-
-						if (r ~= nil and r ~= element) or r == false then return r end
-					end
-
-					return self
-				end
+		for _, element in ipairs (self) do
+			if callback ( element ) == false then
+				continue = false
 			end
-		end,
-	})
+		end
+	end
+	o.n = #o -- wonder why im setting this?
+
+	return o
 end

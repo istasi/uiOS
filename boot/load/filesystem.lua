@@ -1,3 +1,10 @@
+local tostring, tonumber = tostring, tonumber
+local pairs, ipairs = pairs, ipairs
+local error = error
+local cinvoke = component.invoke
+local insert,remove,concat = table.insert, table.remove, table.concat
+
+
 local mounts = {}
 local filesystem = {}
 
@@ -11,14 +18,14 @@ local fileStream = {
 		if self.handler == nil then return nil, tostring(self.file) .. ' ('.. tostring(self.address) ..'): read: handle missing' end
 
 		if length == '*a' or length == '*all' then
-			component.invoke (self.address, 'seek', self.handler, 'set', 0 )
+			cinvoke (self.address, 'seek', self.handler, 'set', 0 )
 			local content = self.buffer or ''
 
 			local continue = true
 			while continue == true do
-				local line = component.invoke (self.address, 'read', self.handler, 1024 )
+				local line = cinvoke (self.address, 'read', self.handler, 1024 )
 				if line == nil then
-					component.invoke (self.address, 'close', self.handler )
+					cinvoke (self.address, 'close', self.handler )
 					continue = false
 				else
 					content = content .. line
@@ -33,7 +40,7 @@ local fileStream = {
 			while continue == true do
 				local pos = self.buffer:find ('\n')
 				if pos == nil then
-					local line = component.invoke (self.address, 'read', self.handler, 1024 )
+					local line = cinvoke (self.address, 'read', self.handler, 1024 )
 					if line == nil then
 						if self.buffer == '' then return nil end
 						out = self.buffer
@@ -68,14 +75,14 @@ local fileStream = {
 				end
 			end
 
-			read = read .. component.invoke (self.address, 'read', self.handler, length )
+			read = read .. cinvoke (self.address, 'read', self.handler, length )
 			return read
 		end
 	end,
 	['write'] = function ( self, message )
 		if self.handler == nil then return nil, self.file .. ': write: handle missing' end
 
-		return component.invoke (self.address, 'write', self.handler, message)
+		return cinvoke (self.address, 'write', self.handler, message)
 	end,
 	['seek'] = function ( self, number )
 		if self.handler == nil then return nil, self.file .. ': seek: handle missing' end
@@ -84,12 +91,12 @@ local fileStream = {
 			return false, 'bad argument #2, number'
 		end
 
-		return component.invoke (self.address, 'write', self.handler, number)
+		return cinvoke (self.address, 'write', self.handler, number)
 	end,
 	['close'] = function ( self )
 		if self.handler == nil then return nil, tostring(self.file) .. ': close: handle missing' end
 
-		return component.invoke (self.address, 'close', self.handler)
+		return cinvoke (self.address, 'close', self.handler)
 	end,
 }
 
@@ -136,7 +143,7 @@ filesystem = {
 		read ['address'] = address
 		read ['file'] = newFile
 
-		read ['handler'] = component.invoke (address, 'open', newFile, mode)
+		read ['handler'] = cinvoke (address, 'open', newFile, mode)
 		return read
 	end,
 	['remove'] = function ( file )
@@ -145,7 +152,7 @@ filesystem = {
 
 		if file == '' or file == '/' then error ( 'Action would destroy the filesystem.' ) end
 
-		return component.invoke (address, 'remove', file)
+		return cinvoke (address, 'remove', file)
 	end,
 	['mount'] = function ( address, path )
 		if path == nil or tostring(path) ~= 'string' then
@@ -158,12 +165,12 @@ filesystem = {
 		local address, path = getPoint ( file )
 		file = file:sub ( path:len () )
 
-		return component.invoke (address, 'exists', file)
+		return cinvoke (address, 'exists', file)
 	end,
 	['isDirectory'] = function ( file )
 		local address, path = getPoint ( file )
 		
-		return component.invoke (address, 'isDirectory', file)
+		return cinvoke (address, 'isDirectory', file)
 	end,
 	['makeDirectory'] = function ( file )
 		local address, path = getPoint ( file )
@@ -172,7 +179,7 @@ filesystem = {
 		if path == nil then path = '' end
 		file = file:sub ( path:len () )
 
-		return component.invoke ( address, 'makeDirectory', file )
+		return cinvoke ( address, 'makeDirectory', file )
 	end,
 	['list'] = function ( path )
 		local address, _path = getPoint ( path )
@@ -181,7 +188,7 @@ filesystem = {
 		if path == ' ' then path = '' end
 		if path == nil then path = '' end
 
-		return component.invoke (address, 'list', path)
+		return cinvoke (address, 'list', path)
 	end,
 	['canonical'] = function ( path )
 		path = path:gsub ( '\\', '/' )
@@ -191,16 +198,16 @@ filesystem = {
 		for k in path:gmatch ( '([^/]*)/?' ) do
 			if k ~= '.' then
 				if k == '..' and #result > 1 then
-					table.remove ( result, #result )
+					remove ( result, #result )
 				elseif k ~= '..' then
-					table.insert ( result, k )
+					insert ( result, k )
 				end
 			end
 		end
 
-		if result [#result] == '' then	table.remove ( result, #result ) end
+		if result [#result] == '' then	remove ( result, #result ) end
 
-		result, _ = table.concat ( result, '/' )
+		result, _ = concat ( result, '/' )
 		return result
 	end
 }

@@ -1,5 +1,6 @@
+--
+-- Initialize desktop variables
 system.gui = dofile ('/library/gui.lua')
-
 
 local screen = system.screens [id]
 screen:clear ()
@@ -7,11 +8,14 @@ screen:clear ()
 local ui = dofile ('/library/ui.lua')
 ui.setScreen ( screen )
 ui.setZone ( dofile ('/library/zone.lua') )
-ui.setEvent ( system.event )
+ui.setEvent ( system.event:create ('ui') )
 
+
+--
+-- Create the dekstop element
+-- this will contain everything on the screen
 local desktop = ui.create ('desktop')
 desktop:isRoot (true)
-
 desktop:attr ({
 	['position'] = 'absolute',
 	['x'] = 1,
@@ -26,162 +30,137 @@ desktop:attr ({
 	['color'] = 0xFFFFFF,
 	['background-color'] = 0x111111,
 })
+
+--
+-- Create the bar which will serve as main method of access programs
 system.gui.useUI(desktop)
-
-
-
-local bar = system.gui.system.bar:create ()
+local bar = system.gui.system.bar:create ('desktop.bar')
+desktop:append ( bar )
 bar:attr ({
+	['position'] = 'relative',
+	['y'] = 1,
+	['y'] = 1,
+
 	['background-color'] = 0xDD8800,
 	['z-index'] = 10,
 })
-desktop:append ( bar )
-bar:on ('drag', function ( ui, e, x,y )	
-	for _,ui in ipairs (ui:root ():search(':type(ui.element.system.bar.object.window)')) do ui:attr ('visibility', 'hidden') end
 
-	ui:attr ({
-		['position'] = 'relative',
-		['y'] = y,
-	})
-	ui:root ():draw ()
-end )
-bar:on ('drop', function ( ui, e, x,y )
-	if y < ui.parent:attr ('height') / 2 then
-		ui:attr ( 'y', 1 )
-	else
-		ui:attr ( 'y', ui.parent:attr('height') )
-	end
 
-	ui:root ():draw ()
-end )
+--
+-- The Programs
+-- this should contain all installed programs, 
+-- Figure a format for them?
+local programs = bar:create ( 'Programs' )
+local window = programs:search('window')[1]
+window:attr ('vertical-align', 'center')
 
-local drawAll = false
-local settings = bar:create ('settings')
-settings:search('window'):attr ({
-	['position'] = 'relative',
-	['width'] = 25,
-	['height'] = 4,
+local list = system.filesystem.list ('/programs/')
+for _,file in ipairs (list) do
+	system.event:push ('programs.add', file:match ('(.-)%.lua'), file )
+end
 
-	['align'] = 'center',
-	['vertical-align'] = 'center',
-})
-local line = settings:search('window'):create ('line')
-settings:search('window'):append ( line )
-line:text ( 'drag me: draw: local' )
-line:attr ({
-	['position'] = 'inline',
-	['align'] = 'center',
+system.event:on ( 'programs.add', function ( event, name, file )
+	local result = bar:search ( 'program.' .. name )
+	if #result < 1 then
+		if system.filesystem.exists ( '/programs/name/' ) == true and system.filesysteme.isDirectory ( '/programs/name/' ) == true then
+		else
+			local unsorted = nil
+			local result = bar:search ( 'programs.unsorted' )
+			if #result < 1 then
+				unsorted = window:create ('programs.unsorted',true)
+				unsorted:attr ({
+					['height'] = 1,
+				})
 
-	['height'] = 1,
-})
-line:on ('touch', function ( ui, e )
-	if drawAll == false then
-		ui:text ( 'drag me: draw(root) ' )
-		drawAll = true
-	else
-		ui:text ( 'drag me: draw(local)' )
-		drawAll = false
-	end
+				unsorted:create ('label',true):attr('align','center'):text ( 'unsorted >' )
+				unsorted:search ('label') [1]:on ('touch', function ( ui, e )
+					e:stopPropagation ( true )
 
-	ui:draw ()
-end )
+					local window = ui.parent:search ('unsorted.window')
+					if #window < 1 then
+						error ( 'unsorted.window is missing.')
+					else
+						if window [1]:attr ('visibility') == 'hidden' then
+							window [1]:attr ( 'visibility', 'visible' )
+							window [1]:draw ()
+						else
+							window [1]:attr ('visibility', 'hidden' )
+							window [1]:root ():draw ()
+						end
+					end
+				end )
 
-local line = settings:search('window'):create ('line')
-settings:search('window'):append ( line )
-line:text ( 'reboot' )
-line:attr ({
-	['position'] = 'inline',
-	['align'] = 'center',
+				unsorted:create ('unsorted.window',true):attr ({
+					['position'] = 'relative',
+					['x'] = unsorted:__computed ('width') + 3,
 
-	['height'] = 1,
-})
-line:on('touch', function ()
-	computer.shutdown ( true )
-end)
+					['width'] = 20,
+					['height'] = 1,
 
-local test = desktop:create ('test')
-desktop:append ( test )
+					['visibility'] = 'hidden',
+					['vertical-align'] = 'top',
 
-test:attr ({
-	['position'] = 'absolute',
-	['x'] = 30,
-	['y'] = 4,
+					['background-color'] = 'inherit',
+				})
 
-	['width'] = 18,
-	['height'] = 7,
+				unsorted.__programs = {}
+			else
+				unsorted = result [1]
+			end
 
-	['background-color'] = 0xAA3300,
+			local window = unsorted:search ('unsorted.window')
+			if #window < 1 then
+				error ( 'unsorted.window is missing.')
+			end
 
-	['align'] = 'center',
-	['vertical-align'] = 'center',
-})
-test:text  ('Drag me')
-test:on('drag', function ( ui, e, x,y )
-	ui:attr ({
-		['x'] = x,
-		['y'] = y,
-	})
+			window = window [1]
 
-	if drawAll == true then
-		ui:root ():draw ()
-	else
-		ui:draw ()
-	end
-end )
-test:on('drop', function ( ui )
-	ui:root ():draw ()
-end )
+			local line = window:create ( 'program.' .. name, true )
+			line:attr ({
+				['height'] = 2,
 
-local __log = true
-if __log == true then
-	local gpu = bar:create ( 'gpu' )
-	gpu:search('window'):attr ({
-		['width'] = 40,
-		['height'] = #screen.gpu.__address + 7,
+				['align'] = 'center',
+				['vertical-align'] = 'bottom',
+			}):text ( name )
 
-		['align'] = 'center',
-		['vertical-align'] = 'center',
-	})
+			line.__file = file
+			line:on ('touch', function ( ui, e )
+				local sys = {}
+				for k,v in pairs ( system ) do sys [k] = v end
 
-	local gpuContent = function ()
-		local str = ' Assigned GPUS:\n'
-		for _,address in ipairs ( screen.gpu.__address ) do
-			str = str .. address .. '\n'
+				sys.event = system.event:create ()
+				sys.desktop = desktop
+				local env = system.environment.base ({
+					['system'] = sys
+				})
+
+				local f, message = env.loadfile ( '/programs/' .. ui.__file, 't', env )
+				if message ~= nil then
+					return sys.event:push ('error', message)
+				end
+
+				sys.event:timer (0, function () f () end )
+			end )
+
+			
+			window:attr ('height', (#window:search ('*') * 2) + 1)
 		end
-
-		str = str .. 'Requesting gpu, 4 times.\n'
-		for i = 1,4 do
-			screen:active ()
-			str = str .. tostring( screen.__use ) .. '\n'
-		end
-
-		gpu:search('window'):attr('height', #screen.gpu.__address + 7)
-		gpu:search('window'):text ( str )
-		gpu:draw ()
 	end
-	system.event:timer ( 1, gpuContent )
-	gpu:on ('touch', function ( ui )
-		gpuContent ()
-	end )
+end )
 
-	local mem = desktop:create ( 'memory' )
-	desktop:append ( mem )
-	mem:attr ({
-		['position'] = 'absolute',
-		['y'] = screen.height,
+--
+-- Initialize the error handler, or ask it to get ready
+do
+	local _sys = {}
+	for k,v in pairs(system) do _sys[k]=v end
 
-		['height'] = 1,
-		['z-index'] = 100,
-	})
-	system.event:interval (1, function ()
-		mem:text ( tostring(math.floor((computer.totalMemory() - computer.freeMemory ()) / 1024)) .. 'KB / ' .. tostring(math.floor(computer.totalMemory()/1024)) .. 'KB' )
-		mem:attr ({
-			['width'] = mem:text():len(),
-			['x'] = screen.width - mem:text():len(),
-		})
+	_sys.environment = ni
+	_sys.desktop = desktop
 
-		mem:draw ()
-	end)
+	_sys.event = system.event:create ( 'Error handling' )
+	system.errorHandler = dofile ('/system/errorHandler.lua', 't', system.environment.base ({
+		['system'] = _sys
+	}) )
 end
 
 desktop:draw ()
