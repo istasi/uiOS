@@ -179,6 +179,7 @@ local function mkdir ( path )
 	end
 end
 
+status.message:write ( 'Fetching current version.db' )
 local content = download ( repo .. 'config/version.db', false )
 if content ~= false then
 	local function p ( content )
