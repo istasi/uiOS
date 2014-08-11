@@ -1,8 +1,46 @@
+local __log = false
+local handle = nil
+
+local function log (message)
+	if __log == true then
+		if handle == nil then handle = system.filesystem.open ('/log/gpu.log','a') end
+		handle:write ( tostring(message) .. '\n' )
+
+		system.event:off('timer'):timer ( 1, function ()
+			handle:close ()
+			handle = nil
+		end )
+	end
+end
+
 -- Land of C-call boundary errors
 -- Most errors in here, unless they happen while loading, will simply cast a C-call boundary error, without as much as a hint that its in here its wrong
 local gpuBoundTo = {}
 local addresses = {}
 local assigned = {}
+
+
+local _cinvoke = component.invoke
+local cinvoke = function ( address, call, ... )
+	local args = {...}
+	log ( tostring(address) ..', '.. tostring(call) ..', '.. table.concat ( args, ', ' ) )
+
+	local result = table.pack (pcall ( _cinvoke, address, call, table.unpack (args) ))
+	local state = result [1]
+	result = table.pack (select ( 2, table.unpack ( result ) )) -- cause retarded table.remove breaks table.unpack
+
+	if state == true then
+		return table.unpack ( result )
+	else
+		local arg = '"' .. address .. '", "' .. call .. '", '
+		for _,value in ipairs (args) do
+			arg = arg .. '"' .. tostring(value) .. '", '
+		end
+		arg = arg:sub ( 1, -3 )
+
+		system.event:signal ( 1, 'error', 'GPU (' .. address ..') attempted to do "gpu.' .. call .. '" resulted in:\n   "' .. result[1] .. '"\n\nArguments given: ' .. arg .. '\n          count: ' .. #{...}  .. '\n\n' .. debug.traceback () )
+	end
+end
 
 local gpu = {
 	['get'] = function ( self )
@@ -11,28 +49,29 @@ local gpu = {
 			['__address'] = {addresses[1]},
 			['__screen'] = false,
 
-			['getScreen'] = function ( self ) 
+			['getScreen'] = function ( self )
 				return self.__screen
 			end,
 
 			['bind'] = function ( self, address )
-				if self:getScreen () == address then return end 
 				self.__screen = address
 
 				for _, __address in ipairs ( self.__address ) do
-					component.invoke ( __address, 'bind', address )
-					gpuBoundTo [__address] = address
+					if gpuBoundTo [__address] ~= address then
+						cinvoke ( __address, 'bind', address )
+						gpuBoundTo [__address] = address
+					end
 				end
 			end,
 
 			['setBackground'] = function ( self, color )
 				for _,address in pairs ( self.__address ) do
-					component.invoke ( address, 'setBackground', color )
+					cinvoke ( address, 'setBackground', color )
 				end
 			end,
 			['setForeground'] = function ( self, color )
 				for _,address in pairs ( self.__address ) do
-					component.invoke ( address, 'setForeground', color )
+					cinvoke ( address, 'setForeground', color )
 				end
 			end,
 		}, {
@@ -47,8 +86,14 @@ local gpu = {
 
 			['__index'] = function ( self, key )
 				return function ( self, ... )
+					if type(self.__screen) ~= 'string' then
+						error ( 'trying to call gpu.' .. key .. ', but no screen have been bound yet' )
+					end
+
+					self:bind ( self.__screen )
+
 					self.__current = tostring(self)
-					return component.invoke ( self.__current, key, ... )
+					return cinvoke ( self.__current, key, ... )
 				end
 			end,
 		})
@@ -67,10 +112,7 @@ local gpu = {
 			local c = #gpu
 			for _,o in ipairs (assigned) do
 				local address = table.remove (gpu, #gpu)
-				if o.__screen ~= false then
-					component.invoke ( address, 'bind', o.__screen ) 
-				end
-
+				
 				table.insert ( o.__address, address )
 			end
 
@@ -93,6 +135,7 @@ local gpu = {
 			end
 		end
 
+		gpuBoundTo [_address] = nil
 		return self:refresh ()
 	end,
 }

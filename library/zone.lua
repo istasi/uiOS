@@ -1,4 +1,4 @@
--- This is a badly written thingy, should not be used by anything but ui.element
+-- This should not be used by anything but ui.element
 -- far too limited in usage for general purpose.
 
 local map = {}

@@ -23,8 +23,13 @@ local errorHandler = {
 }
 
 -- error recieved, throw it in the stack
-system.event:off ('error'):on ('error', function ( event, message )
-	errorHandler:add ( message )
+system.event:off ('error'):on ('error', function ( event, ... )
+	local message = ''
+	for _, value in pairs ({...}) do
+		message = message .. tostring(value) .. ', '
+	end
+
+	errorHandler:add ( message:sub (1, message:len () - 2) )
 end )
 
 -- kernel wants to kill me, but i am alive!
@@ -32,20 +37,37 @@ system.event:off ('process.kill'):on ('process.kill', function ( event, level )
 	event:signal ( 1, 'process.alive' )
 end )
 
-local uiError = system.desktop:search ('desktop.bar')[1]:create ('bar.error')
-uiError:attr ('background-color','transparent')
 
-uiError:search ('window') [1]:attr ({
+--local uiError = system.desktop:search ('desktop.bar')[1]:create ('bar.error')
+local uiError = system.desktop:search ('desktop.bar') [1]:create ( 'desktop.bar.entry', true )
+:attr ({
+	['width'] = 20,
+	['height'] = 1,
+})
+:on ( 'touch', system.desktop:search ('desktop.bar') [1].__unfoldFunction )
+local label = uiError:create ( 'label', true )
+:attr({
+	['align'] = 'center',
+})
+:text ( 'errors (0)' )
+
+uiError:create ( 'desktop.bar.window', true )
+:attr ({
+	['position'] = 'relative',
 	['width'] = 27,
 	['height'] = 0,
 
-	['vertical-align'] = 'center',
+	['x'] = 3,
+	['y'] = 3,
 
+	['vertical-align'] = 'center',
 	['background-color'] = 0x770000,
+
+	['visibility'] = 'hidden',
 })
 
-system.event:on ('update', function ()
-	local window = uiError:search ('window')[1]
+system.event:on ( 'update', function ()
+	local window = uiError:search ('desktop.bar.window')[1]
 
 	local keys = {}
 	for k in pairs ( errorHandler.__list ) do

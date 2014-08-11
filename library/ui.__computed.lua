@@ -27,20 +27,29 @@ return function ( self, key )
 					return 0x000000
 				elseif key == 'color' then
 					return 0xFFFFFF
+				elseif key == 'width' or key == 'height' then
+					return 0
 				end
 			end
 		end
 
+		if type(o) == 'string' and o:sub (-1) == '%' then
+			if self.parent == nil then return 0 end
+
+			local width = self.parent:__computed (key)
+			local p = tonumber(o:sub(1,-2)) / 100
+
+			return width * p
+		end
+
 		return o
 	elseif key == 'XY' then
-		
-
 		if self.parent == nil or self:attr ('position') == 'absolute' then
 			local x = self:attr ('x')
-			if tostring(x) == nil or x == nil then x = 1 end
+			if tostring(x) == nil or x == nil or x == 'auto' then x = 1 end
 
 			local y = self:attr ('y')
-			if tonumber(y) == nil or y == nil then y = 1 end
+			if tonumber(y) == nil or y == nil or y == 'auto' then y = 1 end
 
 
 			return x,y

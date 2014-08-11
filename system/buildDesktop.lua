@@ -1,8 +1,13 @@
 --
--- Initialize desktop variables
-system.gui = dofile ('/library/gui.lua')
+-- Redo error handling, since we dont want to die, incase we recieve a single error
+system.event:off ('error'):on ('error', function ( event, ... )
+	event:signal ( 1, 'error', ... )
+end )
 
+--
+-- Initialize desktop variables
 local screen = system.screens [id]
+screen.gpu:bind ( screen.address )
 screen:clear ()
 
 local ui = dofile ('/library/ui.lua')
@@ -33,9 +38,7 @@ desktop:attr ({
 
 --
 -- Create the bar which will serve as main method of access programs
-system.gui.useUI(desktop)
-local bar = system.gui.system.bar:create ('desktop.bar')
-desktop:append ( bar )
+local bar = desktop:create ( 'desktop.bar', true )
 bar:attr ({
 	['position'] = 'relative',
 	['y'] = 1,
@@ -43,16 +46,66 @@ bar:attr ({
 
 	['background-color'] = 0xDD8800,
 	['z-index'] = 10,
+
+	['height'] = 1,
 })
 
+bar.__unfoldFunction = function ( ui )
+	local window = ui:search ('desktop.bar.window')
+	if #window < 1 then return end
+	window = window [1]
+
+	if window:attr('visibility') == 'hidden' then
+		local any = false
+		ui.parent:search ('window'):each ( function ( window )
+			window:attr ('visibility', 'hidden')
+			any = true
+		end )
+		window:attr ('visibility', 'visible')
+
+		if any == false then
+			window:draw ()
+		else
+			ui:root ():draw ()
+		end
+	else
+		window:attr ('visibility', 'hidden')
+		ui:root ():draw ()
+	end
+end
 
 --
 -- The Programs
 -- this should contain all installed programs, 
 -- Figure a format for them?
-local programs = bar:create ( 'Programs' )
-local window = programs:search('window')[1]
-window:attr ('vertical-align', 'center')
+local programs = bar:create ( 'desktop.bar.entry', true )
+programs:attr ({
+	['width'] = 20,
+	['height'] = 1,
+})
+:on ( 'touch', bar.__unfoldFunction )
+
+local label = programs:create ( 'label', true )
+:attr ({
+	['align'] = 'center',
+})
+:text ( 'Programs' )
+
+local window = programs:create ( 'desktop.bar.window', true )
+:attr ({
+	['position'] = 'relative',
+	['x'] = 3,
+	['y'] = 3,
+
+	['width'] = 20,
+	['height'] = 3,
+
+	['visibility'] = 'hidden',
+
+	['vertical-align'] = 'center',	
+	['background-color'] = 'inherit',
+})
+
 
 local list = system.filesystem.list ('/programs/')
 for _,file in ipairs (list) do
@@ -83,7 +136,7 @@ system.event:on ( 'programs.add', function ( event, name, file )
 				return;
 			end
 			if system.filesystem.exists ( '/programs/' .. name ..'/' .. settings.file ) == false then
-				system.event:push ( 'error', 'building menu, /programs/' .. name .. '/' .. settings.file .. ' was not found (' .. name .. ')' )
+				system.event:push ( 'error', 'building menu, ' .. system.filesystem.canonical ('/programs/' .. name .. '/' .. settings.file) .. ' was not found (' .. name .. ')' )
 
 				return;
 			end
@@ -91,42 +144,18 @@ system.event:on ( 'programs.add', function ( event, name, file )
 			local result = bar:search ( 'programs.' .. name )
 			if #result < 1 then
 				result = window:create ( 'programs.' .. name )
+				window:prepend ( result )
+
 				result:attr ( 'height', 2 )
 
 				local label = result:create ('label', true)
-
-				label:text ( name )
-
-				result:on ( 'touch', function ( ui, event )
-					--system.event:push ( 'program.execute', ui.__file )
+				:attr ('align','center')
+				:text ( name:gsub ('%/$', '') )
+				:on ( 'touch', function ( ui )
+					system.event:push ( 'program.execute', ui.__file )
 				end )
 
-				label.__file = settings.file
-
-				--[[
-				local children = {}
-				local childrenNames = {}
-
-				for k,v in pairs ( window.children ) do
-					local label = v:search ('label')
-
-					if #label > 0 and label[1].name ~= 'programs.unsorted' then
-						table.insert ( childrenNames, label[1]:text () )
-						table.insert ( children, v )
-
-						v:remove ()
-					end
-				end
-
-				table.sort ( childrenNames )
-				for i = #childrenNames, 1, -1 do
-					local element = nil
-
-					for k,v in pairs ( children ) do
-
-					end
-				end
-				]]
+				label.__file = system.filesystem.canonical ( name .. '/' .. settings.file )
 			end
 
 			window:attr ( 'height', (#window.children * 2) + 1 )
@@ -202,24 +231,27 @@ end )
 
 system.event:on ('program.execute', function ( event, file )
 	if system.filesystem.exists ( '/programs/' .. file ) == false then 
-		event:push('error', 'file not found') 
+		return event:push('error', 'program.execute: file not found (/programs/' .. file .. ')') 
 	end
 
 	local sys = {}
 	for k,v in pairs ( system ) do sys [k] = v end
 
-	sys.event = system.event:create ()
+	sys.event = system.event:create ('/programs/' .. file)
 	sys.desktop = desktop
+	sys.screen = screen
+
+
 	local env = system.environment.base ({
 		['system'] = sys
 	})
 
-	local f, message = env.loadfile ( '/programs/' .. file, 't', env )
-	if message ~= nil then
-		return sys.event:push ('error', message)
+	local state, result = pcall ( env.loadfile, '/programs/' .. file, 't', env )
+	if state == false then
+		return sys.event:push ('error', tostring(result) )
 	end
 
-	sys.event:timer (0, function () f () end )
+	sys.event:timer (0, function () result () end )
 end )
 
 --
@@ -232,7 +264,7 @@ do
 	_sys.desktop = desktop
 
 	_sys.event = system.event:create ( 'Error handling' )
-	system.errorHandler = dofile ('/system/errorHandler.lua', 't', system.environment.base ({
+	system.errorHandler = dofile ( '/system/errorHandler.lua', 't', system.environment.base ({
 		['system'] = _sys
 	}) )
 end

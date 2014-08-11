@@ -110,10 +110,6 @@ system.event:timer (0, function ()
 			['system'] = o,
 			['id'] = id,
 		}) )
-
-		e:interval (1, function ()
-			system.screens[id]:set ( 1,2, tostring ( (computer.totalMemory () - computer.freeMemory ()) / 1024 ) .. 'KB' )
-		end )
 	end )
 
 	system.event:on ( 'screen_reconnect', function ( _, id )
@@ -125,14 +121,10 @@ system.event:timer (0, function ()
 	end )
 end )
 
-system.event:on ( 'error', function ( event, message )
-	component.invoke ( component.list('gpu') (), 'set', 4,4, 'system event recieved error: ' .. tostring(message) )
-	while  true do computer.pullSignal () end
-
-	event:signal ( 1, 'process.error', tostring(message) )
+system.event:off ('error'):on ( 'error', function ( event, ... )
+	event:signal ( 1, 'error', ({...})[1] )
 	event:destroy ()
 end )
---system.event.__registered ['error'][1]['func'] ( system.event, 'test error' )
 
 
 return eventHandler.handle ()

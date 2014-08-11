@@ -66,7 +66,7 @@ local __event = {
 			['func'] = func,
 			['_thread'] = nil,
 		}
-		insert ( self.__registered [event], e)
+		insert ( self.__registered [event], e )
 		insert ( registered [event], e )
 
 		return self
@@ -141,6 +141,7 @@ local __event = {
 		insert ( self.__registered ['timer'],  e )
 		insert ( registered ['timer'], e )
 
+		if self.__main == nil then self.__main = e end
 		return id
 	end,
 
@@ -359,7 +360,14 @@ eventHandler = {
 
 						
 						if state == false then
-							event.owner:push ( 'error', table.unpack (reason) )
+							if reason [1] == 'too long without yielding' then
+								if event.owner.__main == event then
+									reason [1] = event.owner.name .. ': main: ' .. reason [1]
+								else
+									reason [1] = event.owner.name .. ': ' .. e .. ': ' .. reason [1]
+								end
+							end
+							event.owner:push ( 'error', reason [1] )
 						else
 							local state, r = cstatus ( event['__thread'] )
 							if state ~= 'suspended' then
@@ -384,15 +392,26 @@ eventHandler = {
 									if event.owner.__registered [__event] == nil then event.owner.__registered [ __event ] = {} end
 									event.owner.__pulling = event['__thread']
 
-									event.owner:on ( __event, function ( event, ... )
-										cresume ( event.__pulling, event, ... )
-									end )
-									event.owner:timer ( time, function ( event )
-										if event ~= nil and cstatus (event.__pulling) == 'suspended' then
-											cresume (event.__pulling)
-											event.__pulling = nil
-										end
-									end )
+									insert ( event.owner.__registered [ __event ], { 
+										['owner'] = event.owner,
+										['type'] = 'event.object',
+
+										['once'] = true,
+										['arguments'] = reason,
+										['func'] = function () end,
+										['__thread'] = event['__thread'],
+									} )
+									insert ( event.owner.__registered ['timer'], { 
+										['owner'] = event.owner,
+										['type'] = 'event.object',
+
+										['once'] = true,
+										['time'] = time + computer.uptime (),
+										['arguments'] = reason,
+										['func'] = function () end,
+										['__thread'] = event['__thread'],
+									} )
+									
 								else
 									if event.owner.__registered [ reason[1] ] == nil then event.owner.__registered [ reason[1] ] = {} end
 									insert ( event.owner.__registered [ remove (reason,1) ], { 
@@ -433,10 +452,14 @@ eventHandler = {
 local sys = eventHandler.create ( nil, 'kernel' )
 sys:off ('error'):on ('error', function ( event, ... )
 	local args = {...}
-	if event.__errorHandler ~= nil then
+	if event.__errorHandler ~= nil and args[1] == event.__errorHandler then
 		event:push ( 'event-handler.stop', 'Error handler seems to have been killed: \n  "' .. table.concat (args, ', ' ) .. '"' )
 	else
-		event:push ( 'event-handler.stop', 'Here: ' .. table.concat ( args, ', ' ) )
+		if type(args[2]) == 'number' then
+			event:push ( 'event-handler.stop', '\n   Kernel: pid ' .. args[2] .. ' reports: \n' .. args[1] )
+		else
+			event:push ( 'event-handler.stop', args[1] )
+		end
 	end
 end )
 

@@ -1,12 +1,3 @@
-local __log = false
-local function log (message)
-	if __log == true then
-		local handle = system.filesystem.open ('/log/screen.log','a')
-		handle:write ( tostring(message) .. '\n' )
-		handle:close ()
-	end
-end
-
 local screen = {
 	['type'] = 'screen',
 	['address'] = component.list('screen', true) (),
@@ -43,8 +34,8 @@ local screen = {
 		return self
 	end,
 	['set'] = function ( self, x,y, message, vertical )
-		self:setBackground ()
-		self:setForeground ()
+		--self:setBackground ()
+		--self:setForeground ()
 
 		if self.buffer then
 			if self.buffer:set ( x,y, message ) > 1 then
@@ -94,13 +85,12 @@ local screen = {
 
 		return self
 	end,
+	['copy'] = function ( self, x,y, width, height, toX, toY )
+		self.gpu:copy ( x,y, width, height, toX, toY )
+		return self
+	end,
 	['setBackground'] = function ( self, color )
-		if color == nil then
-			if self.gpu:getBackground () ~= self.bgColor then
-				self.gpu:setBackground ( self.bgColor )
-			end
-			return true
-		end
+		if color == nil then return self end
 		if type(color) == 'string' then
 			local tmp = color:match ( '0x([0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F])' )
 			if tmp == nil and color:match ('^%d+$') ~= nil then
@@ -111,19 +101,17 @@ local screen = {
 				color = tonumber(tmp,16)
 			end
 		end
+		if self.bgColor == color then return self end
 	
 		self.bgColor = color
+		self.gpu:setBackground ( self.bgColor )
+		return self
 	end,
 	['getBackground'] = function ( self )
 		return self.gpu:getBackground ()
 	end,
 	['setForeground'] = function ( self, color )
-		if color == nil then
-			if self.gpu:getForeground () ~= self.fgColor then
-				self.gpu:setForeground ( self.fgColor ) 
-			end
-			return true
-		end
+		if color == nil then return self end
 		if type(color) == 'string' then
 			local tmp = color:match ( '0x([0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F])' )
 			if tmp == nil and color:match ('^%d+$') ~= nil then
@@ -134,8 +122,11 @@ local screen = {
 				color = tonumber(tmp,16)
 			end
 		end
+		if self.fgColor == color then return self end
 
 		self.fgColor = color
+		self.gpu:setForeground ( self.fgColor )
+		return self
 	end,
 	['getForeground'] = function ( self )
 		return self.gpu:getForeground ()

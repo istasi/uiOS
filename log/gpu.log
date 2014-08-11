@@ -1,0 +1,17 @@
+294a71e3-1791-4f3b-8726-da56f318f71e, bind, 6d307cc2-22cc-4e64-888b-8d3cabac60e6
+852525b6-7d87-48a3-adc2-48e3b4c85bdb, bind, 6d307cc2-22cc-4e64-888b-8d3cabac60e6
+1ccf60d9-92d2-4967-ad61-bed9044e8549, bind, 6d307cc2-22cc-4e64-888b-8d3cabac60e6
+852525b6-7d87-48a3-adc2-48e3b4c85bdb, maxResolution, 
+1ccf60d9-92d2-4967-ad61-bed9044e8549, fill, 1, 1, 160, 50,  
+294a71e3-1791-4f3b-8726-da56f318f71e, getResolution, 
+294a71e3-1791-4f3b-8726-da56f318f71e, setBackground, 1118481
+852525b6-7d87-48a3-adc2-48e3b4c85bdb, setBackground, 1118481
+1ccf60d9-92d2-4967-ad61-bed9044e8549, setBackground, 1118481
+852525b6-7d87-48a3-adc2-48e3b4c85bdb, fill, 1, 1, 160, 50,  
+294a71e3-1791-4f3b-8726-da56f318f71e, setBackground, 14518272
+852525b6-7d87-48a3-adc2-48e3b4c85bdb, setBackground, 14518272
+1ccf60d9-92d2-4967-ad61-bed9044e8549, setBackground, 14518272
+1ccf60d9-92d2-4967-ad61-bed9044e8549, fill, 1, 1, 160, 1,  
+294a71e3-1791-4f3b-8726-da56f318f71e, set, 1, 1,       Programs      
+852525b6-7d87-48a3-adc2-48e3b4c85bdb, set, 21, 1,      errors (0)     
+1ccf60d9-92d2-4967-ad61-bed9044e8549, set, 21, 1,      errors (0)     

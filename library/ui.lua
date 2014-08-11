@@ -1,18 +1,25 @@
-local __log = false
-local function log (message)
-	if __log == true then
-		local handle = system.filesystem.open ('/log/ui.log','a')
-		handle:write (tostring(message) .. '\n')
-		handle:close ()
-	end
-end
-
-
-local ui = {}
-
 local _event
 local _zone
 local _screen
+
+local __log = false
+local handle = nil
+
+local function log (message)
+	if __log == true then
+		if handle == nil then handle = system.filesystem.open ('/log/ui.log','a') end
+		handle:write ( tostring(message) .. '\n' )
+
+		system.event:off('timer'):timer ( 1, function ()
+			handle:close ()
+			handle = nil
+		end )
+	end
+end
+
+local ui = {}
+
+
 
 
 local enum = {
@@ -100,43 +107,43 @@ enum = setmetatable ( enum, {
 	end,
 } )
 
+local defaultStyle = {
+	['position'] = enum ('absolute', 'relative', 'inline', 'block'):set( 'inline' ),
+	['x'] = 'auto',
+	['y'] = 'auto',
+
+	['z-index'] = 0,
+
+	['width'] = 'inherit',
+	['height'] = 'inherit',
+
+	['color'] = 0xFFFFFF,
+	['background-color'] = 'transparent',
+
+	['align'] = 'left', enum ('left','center','right'):set( 'left' ),
+	['vertical-align'] = enum ('top','center','bottom'):set( 'top' ),
+
+	['visibility'] = enum ('visible','hidden'):set('visible'),
+}
+
 local style = {
 	['type'] = 'style',
-
-	['__default'] = {
-		['position'] = enum ('absolute', 'relative', 'inline', 'block'):set( 'inline' ),
-		['x'] = 'auto',
-		['y'] = 'auto',
-
-		['z-index'] = 0,
-
-		['width'] = 'inherit',
-		['height'] = 'inherit',
-
-		['color'] = 0xFFFFFF,
-		['background-color'] = 'transparent',
-
-		['align'] = 'left', enum ('left','center','right'):set( 'left' ),
-		['vertical-align'] = enum ('top','center','bottom'):set( 'top' ),
-
-		['visibility'] = enum ('visible','hidden'):set('visible'),
-	},
 	['__values'] = {},
 
 	['set'] = function ( self, key, value )
-		if type ( self.__default [key] ) == 'table' and self.__default [key].type == 'enum' then
-			local state, message = self.__default [key]:test ( value ) 
+		if type ( defaultStyle [key] ) == 'table' and defaultStyle [key].type == 'enum' then
+			local state, message = defaultStyle [key]:test ( value ) 
 			if state == false then
 				return false, message
 			end
 
-			if tostring(value) ~= tostring(self.__default[key]) then
+			if tostring(value) ~= tostring(defaultStyle[key]) then
 				self.__values [key] = value
 			else
 				self.__values [key] = nil
 			end
 		else
-			if value ~= self.__default [key] then
+			if value ~= defaultStyle [key] then
 				self.__values [key] = value
 			else
 				self.__values [key] = nil
@@ -146,36 +153,36 @@ local style = {
 	end,
 	['get'] = function ( self, key )
 		if self.__values [key] == nil then
-			if type(self.__default [key]) == 'table' and self.__default [key].type == 'enum' then
-				return tostring(self.__default [key])
+			if type(defaultStyle [key]) == 'table' and defaultStyle [key].type == 'enum' then
+				return tostring(defaultStyle [key])
 			end
-			return self.__default [key]
+			return defaultStyle [key]
 		end
 
 		return self.__values [key]
 	end,
 	['test'] = function ( self, key )
-		if self.__default [key] == nil then 
+		if defaultStyle [key] == nil then 
 			return false
 		end
 		return true
 	end,
 	['default'] = function ( self, key, value )
 		if value == nil then
-			if self.__default == nil then
+			if defaultStyle == nil then
 				error ( '__default is missing \n' .. debug.traceback () )
 			end
 
-			return self.__default [key]
+			return defaultStyle [key]
 		end
 
-		if type(self.__default [key]) == 'table' and self.__default [key].type == 'enum' then
-			local state, message = self.__default [key]:set ( value )
+		if type(defaultStyle [key]) == 'table' and defaultStyle [key].type == 'enum' then
+			local state, message = defaultStyle [key]:set ( value )
 			if state == false then
 				return false, message
 			end
 		else
-			self.__default [key] = value
+			defaultStyle [key] = value
 		end
 		return true
 	end,
@@ -215,19 +222,24 @@ function element.append ( self, element )
 
 	return self
 end
-function element.prepend ( self, element )
+function element.prepend ( self, element, position)
+	position = position or 1
 	if type (self) ~= 'table' or self.type:match ('^ui%.element') == nil then
 		error ( 'ui.element:prepend (), self is missing, or not of type ui.element' )
 	end
 	if type (element) ~= 'table' or element.type:match ('^ui%.element') == nil then
 		error ( 'ui.element:prepend (), element provided is not of type ui.element' )
 	end
+	if type (position) ~= 'number' then
+		error ( 'ui.element:prepend (), position argument provided, must be of type number.')
+	end
 
 	if element.parent ~= nil then
 		element.parent:remove ( element )
 	end
 	element.parent = self
-	table.insert ( self.children, 1, element )
+
+	table.insert ( self.children, position, element )
 
 	return self
 end
@@ -346,21 +358,10 @@ function element.draw ( self, ignore )
 	end
 	if self:attr ( 'visibility' ) == 'hidden' then return self end
 
-	if self.__root == true and ignore ~= true then
-		self.__drawAll = _event:off('timer',self.__drawAll):timer (0.01, function ()
-			self:draw ( true )
-
-			self.__drawAll = nil
-		end )
-
-		return self
-	end
-
 	local background = self:attr ('background-color')
 	local x,y = nil,nil
 	if background ~= 'transparent' then
 		x,y = self:__computed ('XY')
-		--error ( 'here:' .. tostring(x) )
 
 		_screen:setBackground ( self:__computed('background-color') )
 
@@ -374,7 +375,7 @@ function element.draw ( self, ignore )
 		local width = tonumber( self:__computed ('width') )
 
 		local lines = {}
-		for line in self.message:gmatch ('([^\n]*)\n?') do table.insert ( lines, line ) end
+		for line in tostring(self.message):gmatch ('([^\n]*)\n?') do table.insert ( lines, line ) end
 	
 		if self:attr ('vertical-align') == 'center' then
 			local height = self:__computed ('height')
@@ -399,8 +400,9 @@ function element.draw ( self, ignore )
 				offsetX = width - system.unicode.len (line)
 			end
 			line = string.rep ( ' ', tonumber(offsetX) or 0 ) .. line
+			line = line .. string.rep ( ' ', width - line:len () )
 
-			log ( tostring (self.name .. ':set') )
+			log ( tostring (self.name .. ':set: ') .. line )
 			_screen:set ( tonumber(x), (y + offsetY - 1), line )
 		end
 
@@ -408,23 +410,40 @@ function element.draw ( self, ignore )
 		local zMap = {}
 		local zIndexes = {}
 
-		for _,child in ipairs ( self.children ) do
+		for id,child in ipairs ( self.children ) do
 			local z = child:attr ('z-index')
 
 			if zIndexes [z] == nil then zIndexes [z] = {} end
-			table.insert ( zIndexes [z], child )
-
+			table.insert ( zIndexes [z], id )
 			table.insert ( zMap, z )
 		end
 
+		local drawn = {}
 		table.sort ( zMap )
 		for _,z in ipairs ( zMap ) do
-			for _,child in ipairs ( zIndexes [z] ) do
-				child:draw ()
+			for _,id in ipairs ( zIndexes [z] ) do
+				if drawn [id] ~= true then 
+					local child = self.children [id]
+
+					log ( tostring(self.name) .. ': Child draw: (), ' .. tostring(child.name) )
+					child:draw ()
+
+					drawn [id] = true
+				end
 			end
 		end
 	end
 end
+function element.copyTo ( self, x,y )
+	local _x,_y = self:__computed ('XY')
+	_screen:copy ( _x,_y, self:__computed('width'), self:__computed ('height'), (x - _x), (y - _y) )
+
+	self:attr ({
+		['x'] = x,
+		['y'] = y,
+	})
+end
+
 function element.on ( self, event, callback )
 	if type (self) ~= 'table' or self.type:match ('^ui%.element') == nil then
 		error ( 'ui.element:on (), self is missing, or not of type ui.element' )
@@ -460,6 +479,7 @@ function element.on ( self, event, callback )
 	if _event.uiActive == nil then
 		_event.uiActive = true
 
+		_event:off ('error'):on ( 'error', function ( event, ... ) event:signal ( 1, 'process.error', ... ) end )
 		_event:on ( 'touch', function ( e, address, x,y, button, who )
 			if _screen.address ~= address then return end
 
@@ -622,7 +642,6 @@ function ui.create ( name )
 		['name'] = name,
 
 		['style'] = style (),
-		['children'] = {},
 
 		['append'] = element.append,
 		['prepend'] = element.prepend,
@@ -644,10 +663,12 @@ function ui.create ( name )
 		['isRoot'] = element.isRoot,
 
 		['draw'] = element.draw,
+		['copyTo'] = element.copyTo,
 
 		['search'] = element.search,
 		['__computed'] = element.__computed,
 	}
+	o.children = {}
 
 	return o
 end
