@@ -56,13 +56,80 @@ window:attr ('vertical-align', 'center')
 
 local list = system.filesystem.list ('/programs/')
 for _,file in ipairs (list) do
-	system.event:push ('programs.add', file:match ('(.-)%.lua'), file )
+	if system.filesystem.isDirectory ( '/programs/' .. file ) == true then
+		system.event:push ('programs.add', file )
+	else
+		local unsortedFile = file:match ('(.-)%.lua')
+		if unsortedFile ~= nil then
+			system.event:push ('programs.add', unsortedFile, file )
+		end
+	end
 end
 
 system.event:on ( 'programs.add', function ( event, name, file )
+	if name == nil then return end
+
 	local result = bar:search ( 'program.' .. name )
 	if #result < 1 then
-		if system.filesystem.exists ( '/programs/name/' ) == true and system.filesysteme.isDirectory ( '/programs/name/' ) == true then
+		if system.filesystem.exists ( '/programs/' .. name .. '/setup.lua' ) == true then
+			local file = system.filesystem.open ( '/programs/' .. name .. '/setup.lua', 'r' )
+			local settings = system.serialize.unpack ( file:read ('*a') )
+			file:close ();
+
+			if type(settings) ~= 'table' then return end
+			if settings.file == nil then
+				system.event:push ( 'error', 'building menu, no file provided for me to run ('.. name ..')' )
+
+				return;
+			end
+			if system.filesystem.exists ( '/programs/' .. name ..'/' .. settings.file ) == false then
+				system.event:push ( 'error', 'building menu, /programs/' .. name .. '/' .. settings.file .. ' was not found (' .. name .. ')' )
+
+				return;
+			end
+
+			local result = bar:search ( 'programs.' .. name )
+			if #result < 1 then
+				result = window:create ( 'programs.' .. name )
+				result:attr ( 'height', 2 )
+
+				local label = result:create ('label', true)
+
+				label:text ( name )
+
+				result:on ( 'touch', function ( ui, event )
+					--system.event:push ( 'program.execute', ui.__file )
+				end )
+
+				label.__file = settings.file
+
+				--[[
+				local children = {}
+				local childrenNames = {}
+
+				for k,v in pairs ( window.children ) do
+					local label = v:search ('label')
+
+					if #label > 0 and label[1].name ~= 'programs.unsorted' then
+						table.insert ( childrenNames, label[1]:text () )
+						table.insert ( children, v )
+
+						v:remove ()
+					end
+				end
+
+				table.sort ( childrenNames )
+				for i = #childrenNames, 1, -1 do
+					local element = nil
+
+					for k,v in pairs ( children ) do
+
+					end
+				end
+				]]
+			end
+
+			window:attr ( 'height', (#window.children * 2) + 1 )
 		else
 			local unsorted = nil
 			local result = bar:search ( 'programs.unsorted' )
@@ -125,27 +192,34 @@ system.event:on ( 'programs.add', function ( event, name, file )
 
 			line.__file = file
 			line:on ('touch', function ( ui, e )
-				local sys = {}
-				for k,v in pairs ( system ) do sys [k] = v end
-
-				sys.event = system.event:create ()
-				sys.desktop = desktop
-				local env = system.environment.base ({
-					['system'] = sys
-				})
-
-				local f, message = env.loadfile ( '/programs/' .. ui.__file, 't', env )
-				if message ~= nil then
-					return sys.event:push ('error', message)
-				end
-
-				sys.event:timer (0, function () f () end )
+				system.event:push ( 'program.execute', ui.__file )
 			end )
-
 			
 			window:attr ('height', (#window:search ('*') * 2) + 1)
 		end
 	end
+end )
+
+system.event:on ('program.execute', function ( event, file )
+	if system.filesystem.exists ( '/programs/' .. file ) == false then 
+		event:push('error', 'file not found') 
+	end
+
+	local sys = {}
+	for k,v in pairs ( system ) do sys [k] = v end
+
+	sys.event = system.event:create ()
+	sys.desktop = desktop
+	local env = system.environment.base ({
+		['system'] = sys
+	})
+
+	local f, message = env.loadfile ( '/programs/' .. file, 't', env )
+	if message ~= nil then
+		return sys.event:push ('error', message)
+	end
+
+	sys.event:timer (0, function () f () end )
 end )
 
 --

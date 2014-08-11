@@ -162,6 +162,10 @@ local style = {
 	end,
 	['default'] = function ( self, key, value )
 		if value == nil then
+			if self.__default == nil then
+				error ( '__default is missing \n' .. debug.traceback () )
+			end
+
 			return self.__default [key]
 		end
 

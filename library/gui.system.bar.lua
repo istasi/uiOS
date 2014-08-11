@@ -20,7 +20,7 @@ element:attr ({
 
 
 element ['create'] = function ( self, name )
-	local child = __ui:create ('object')
+	local child = __ui:create ('ui.element.system.bar.object')
 	self:append ( child )
 	child.type = 'ui.element.system.bar.object'
 	child:attr ({
@@ -59,7 +59,6 @@ element ['create'] = function ( self, name )
 		['visibility'] = 'hidden',
 	})
 	
-
 	child:on ('touch', function ( ui, e, x,y, button )
 		if ui:search('window') [1]:attr ('visibility') == 'hidden' then
 			ui.parent:search(':type(ui.element.system.bar.object.window)'):each ( function ( ui ) ui:attr ('visibility', 'hidden') end )
