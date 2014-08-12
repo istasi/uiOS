@@ -366,7 +366,7 @@ function element.draw ( self, ignore )
 		_screen:setBackground ( self:__computed('background-color') )
 
 		local width, height = self:attr ('width'), self:attr ('height')
-		log ( tostring (self.name .. ':fill') )
+		log ( tostring (self.name) .. ':fill' )
 		_screen:fill ( x,y, self:__computed ('width'),self:__computed ('height'), ' ' )
 	end
 
@@ -613,6 +613,7 @@ function element.isRoot ( self, bool )
 	end
 
 	self.__root = bool
+	return self
 end
 function element.root ( self )
 	if type (self) ~= 'table' or self.type:match ('^ui%.element') == nil then
@@ -636,10 +637,10 @@ ui = {
 	['element'] = element,
 }
 
-function ui.create ( name )
+function ui.create ( self, name )
 	local o = {
 		['type'] = element.type,
-		['name'] = name,
+		['name'] = name or self,
 
 		['style'] = style (),
 
@@ -673,8 +674,8 @@ function ui.create ( name )
 	return o
 end
 
-function ui.setEvent ( event ) _event = event end
-function ui.setScreen ( screen ) _screen = screen end
-function ui.setZone ( zone ) _zone = zone end
+function ui.setEvent ( self, event ) _event = event or self end
+function ui.setScreen ( self, screen ) _screen = screen or self end
+function ui.setZone ( self, zone ) _zone = zone or self end
 
 return ui

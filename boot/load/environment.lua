@@ -16,8 +16,6 @@ local base = {
 	['setmetatable'] = setmetatable,
 	['getmetatable'] = getmetatable,
 
-	['computer'] = computer,
-
 	['table'] = {
 		['insert'] = table.insert,
 		['remove'] = table.remove,
@@ -44,6 +42,9 @@ local base = {
 	},
 
 	['computer'] = {
+		['totalMemory'] = computer.totalMemory,
+		['freeMemory'] = computer.freeMemory,
+
 		['uptime'] = computer.uptime,
 		['shutdown'] = computer.shutdown,
 		['pullSignal'] = computer.pullSignal,
@@ -102,7 +103,7 @@ local function c ( t, o )
 	o = o or {}
 
 	for k,v in pairs ( t ) do
-		if type(v) == 'table' then
+		if type(v) == 'table' and v.type == nil then
 			o[k] = c(v)
 		else
 			o[k] = v

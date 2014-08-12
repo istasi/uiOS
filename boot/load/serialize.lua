@@ -61,7 +61,9 @@ function serialize.fromFile ( _file )
 		if require('filesystem').exists ( _file ) == false then error ( 'serialize.fromFile, File does not exist.' ) end
 		file = io.open ( _file, 'r' )
 	else
-		if filesystem.exists ( file ) == false then error ( 'serialize.fromFile, File does not exist.' ) end
+		local filesystem = filesystem
+		if system ~= nil then filesystem = system.filesystem end
+		if filesystem.exists ( _file ) == false then error ( 'serialize.fromFile, File does not exist.' ) end
 		file = filesystem.open ( _file, 'r' )
 	end
 
@@ -78,7 +80,9 @@ function serialize.toFile ( _file, _table, pretty )
 		if require('filesystem').exists ( _file ) == false then error ( 'serialize.toFile, File does not exist.' ) end
 		file = io.open ( _file, 'w' )
 	else
-		if filesystem.exists ( file ) == false then error ( 'serialize.toFile, File does not exist.' ) end
+		local filesystem = filesystem
+		if system ~= nil then filesystem = system.filesystem end
+		if filesystem.exists ( _file ) == false then error ( 'serialize.toFile, File does not exist.' ) end
 		file = filesystem.open ( _file, 'w' )
 	end
 

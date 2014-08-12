@@ -101,6 +101,7 @@ local fileStream = {
 }
 
 local function getPoint ( file )
+	if type(file) ~= 'string' then error ( 'filesystem.getPoint (), protected, recieved ' .. type(file) .. '\n' .. debug.traceback () ) end
 	if file:sub (1,1) ~= '/' then file = '/' .. file end
 	file = filesystem.canonical ( file )
 

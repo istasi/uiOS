@@ -27,7 +27,7 @@ function print ( message )
 end
 
 function loadfile ( _file, mode, env )
-	if type(_file) ~= 'string' then error ( 'loadfile (), #1 argument should be a string path toa file' ) end
+	if type(_file) ~= 'string' then error ( 'loadfile (), #1 argument should be of type string' ) end
 	if system.filesystem.exists ( _file ) == false then error ( 'loadfile (), supplied file does not exist' ) end
 	if system.filesystem.isDirectory ( _file ) == true then error ( 'loadfile (), supplied file is a directory' ) end
 
@@ -43,12 +43,17 @@ function loadfile ( _file, mode, env )
 end
 
 function dofile ( _file, mode, env )
+	if type(_file) ~= 'string' then error ( 'dofile (), #1 arguement should be of type string' ) end
+	if system.filesystem.exists ( _file ) == false then error ( 'dofile (), supplied file does not exist' ) end
+	if system.filesystem.isDirectory ( _file ) == true then error ( 'dofile (), supplied file is a directory' ) end
+
 	local _function = loadfile ( _file, mode or 't', env )
 	local state, result = pcall ( _function )
 	if state == false then error ( 'dofile (' .. tostring(_file) .. '):\n' .. tostring(result) .. '\n' ) end
 
 	return result
 end
+
 
 system.environment.set ( 'dofile', dofile )
 system.environment.set ( 'loadfile', loadfile )
@@ -61,11 +66,12 @@ end
 
 system.config 	= dofile ('/library/config.lua')
 system.gpu 		= dofile ('/library/gpu.lua')
-system.screens 	= dofile ('/library/difference.lua') -- Wonder if this one even saves me anything?, it seemed like a great idea in my mind, i wonder i wonder.
+system.screens 	= dofile ('/library/difference.lua') -- Wonder if this one even saves me anything?, it seemed like a great idea at the time, i wonder i wonder.
 system.screens:setDefault (dofile ('/library/screen.lua'))
 
 system.event:timer (0, function ()
 	system.event:on ( 'component_added', function ( e, address, _type )
+		--error ( tostring(_type) )
 		if _type ~= 'screen' then return end
 
 		local i = false
@@ -83,12 +89,10 @@ system.event:timer (0, function ()
 	end )
 	for address in component.list ('screen', true) do system.event:push ( 'component_added', address, 'screen' ) end
 
-
 	system.event:on ( 'component_added', function ( _, address, _type ) 
-		
-
 		if _type ~= 'gpu' then return end
 		system.gpu:addGPU (address)
+
 	end )
 	system.event:on ( 'component_removed', function ( _, address, _type )
 		if _type ~= 'gpu' then return end
@@ -100,23 +104,23 @@ system.event:timer (0, function ()
 	end )
 
 
+	local screenInitialized = false
 	if system.config.screens == nil then system.config.screens = {} end
 	system.event:on ( 'screen_added', function ( e, id )
-		local o = {}
-		for k,v in pairs (system) do o[k]=v end
-		o.event = system.event:create ('desktop: ' .. system.screens[id].address )
+		-- Bind our desktop to the first available screen.
+		if screenInitialized == false then
+			local o = {}
+			for k,v in pairs (system) do o[k]=v end
+			o.event = system.event:create ('desktop: ' .. system.screens [id].address )
+			o.screen = system.screens [id]
 
-		system.config.screens [system.screens[id].address] = dofile ('/system/buildDesktop.lua', 't', system.environment.base ({
-			['system'] = o,
-			['id'] = id,
-		}) )
-	end )
+			system.config.screens [system.screens[id].address] = dofile ('/system/initialize.lua', 't', system.environment.base ({
+				['system'] = o,
+			}) )
 
-	system.event:on ( 'screen_reconnect', function ( _, id )
-		local desktop = system.config.screens [system.screens [id].address]
+			screenInitialized = true
 
-		if type (desktop) == 'table' and desktop.type == 'ui.element' then
-			desktop:draw ()
+			--e:interval (1, function () o.screen:set ( 1,2, (computer.totalMemory () - computer.freeMemory ()) / 1024 .. 'KB' ) end )
 		end
 	end )
 end )

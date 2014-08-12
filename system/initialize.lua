@@ -1,9 +1,84 @@
+system.event.name = '[System]'
+
+-- 
+-- Any component:gpu, bound to this api:gpu, havn't yet been bound to a screen, since none have been supplied, until just now
+-- So lets sure all of them are bound, any gpu's added from this point on will get bound automatically due to this.
+system.screen.gpu:bind ( system.screen.address )
+
+local programs = {}
+local keys = {}
+do
+	local keywords = {
+		['initialize'] = 1,
+		['default'] = 10,
+	}
+
+	for _, entry in ipairs ( system.filesystem.list ( '/programs/' ) ) do
+		if system.filesystem.exists ('/programs/' .. entry) == true and system.filesystem.exists ('/programs/' .. entry .. '/setup.lua') == true and system.filesystem.isDirectory ('/programs/' .. entry .. '/setup.lua') == false then
+			local config = system.serialize.fromFile ('programs/' .. entry .. '/setup.lua')
+			if type(config) == 'table' then
+				local level = keywords['default']
+
+				if config ['run-level'] ~= nil then
+					if type(config['run-level']) == 'string' then
+						if keywords [config['run-level']] ~= nil then
+							level = keywords [config['run-level']]
+						end
+					elseif type(config['run-level']) == 'number' then
+						level = config['run-level']
+					end
+				end
+
+				config.path = '/programs/' .. entry
+				if programs [level] == nil then programs [level] = {} end
+				table.insert ( programs [level], config )
+
+				local found = false
+				for _, value in pairs ( keys ) do if value == level then found = true end end
+				if found == false then table.insert ( keys, level ) end
+			end
+		end
+	end
+end
+
+table.sort ( keys )
+for i, level in ipairs ( keys ) do
+	for _, config in ipairs ( programs [level] ) do
+		if config ['auto-run'] == true then
+			if config ['file'] ~= nil and system.filesystem.exists (config.path .. config.file) == true then
+				system.event:push ( 'program.execute', config.path .. config.file )
+			end
+		end
+	end
+end
+
+system.event:on ('program.execute', function ( event, file, owner )
+	if system.filesystem.exists ( file ) == false then 
+		return event:push('error', 'program.execute: file not found (' .. file .. ')') 
+	end
+
+	local env = system.environment.base ()
+	for k,v in pairs ( system ) do env [k] = v end
+	env.event = system.event:create ( owner or file )
+	env.screen = system.screen
+	env.environment = system.environment
+
+	local state, result = pcall ( loadfile, file, 't', env )
+	if state == false then
+		return env.event:push ('error', tostring(result) )
+	end
+
+	env.event:on ('main', function () result () end)
+	env.event:push ('main')
+end )
+
+--[[
 --
 -- Redo error handling, since we dont want to die, incase we recieve a single error
 system.event:off ('error'):on ('error', function ( event, ... )
 	event:signal ( 1, 'error', ... )
 end )
-
+--[[
 --
 -- Initialize desktop variables
 local screen = system.screens [id]
@@ -15,6 +90,7 @@ ui.setScreen ( screen )
 ui.setZone ( dofile ('/library/zone.lua') )
 ui.setEvent ( system.event:create ('ui') )
 
+--[[
 
 --
 -- Create the dekstop element
@@ -229,30 +305,8 @@ system.event:on ( 'programs.add', function ( event, name, file )
 	end
 end )
 
-system.event:on ('program.execute', function ( event, file )
-	if system.filesystem.exists ( '/programs/' .. file ) == false then 
-		return event:push('error', 'program.execute: file not found (/programs/' .. file .. ')') 
-	end
-
-	local sys = {}
-	for k,v in pairs ( system ) do sys [k] = v end
-
-	sys.event = system.event:create ('/programs/' .. file)
-	sys.desktop = desktop
-	sys.screen = screen
 
 
-	local env = system.environment.base ({
-		['system'] = sys
-	})
-
-	local state, result = pcall ( env.loadfile, '/programs/' .. file, 't', env )
-	if state == false then
-		return sys.event:push ('error', tostring(result) )
-	end
-
-	sys.event:timer (0, function () result () end )
-end )
 
 --
 -- Initialize the error handler, or ask it to get ready
@@ -270,4 +324,5 @@ do
 end
 
 desktop:draw ()
-return desktop
+]]
+return {}

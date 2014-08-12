@@ -2,7 +2,6 @@ local address = component.list ('internet',true) ()
 address = address or computer.getBootAddress ()
 
 _G ['repo'] = 'http://istasi.dk/opencomputer/uiOS/'
-_G ['urlOpts'] = '?live'
 
 local handle = nil
 if address ~= computer.getBootAddress () then
@@ -10,6 +9,7 @@ if address ~= computer.getBootAddress () then
 else
 	handle = component.invoke ( address, 'open', '/boot/init.lua', 'r' )
 end
+if handle == nil then return end
 
 local content = '' 
 local continue = true
@@ -39,5 +39,7 @@ end
 
 
 local f,e = load ( content, 'boot/init.lua' )
-if type(f) ~= 'function' then error (e or 'function not returned') end
+if type(f) ~= 'function' then
+	error ( tostring(e or 'function not returned') ) 
+end
 f ()

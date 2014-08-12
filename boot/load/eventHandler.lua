@@ -7,10 +7,14 @@ local random = math.random
 local setmetatable, getmetatable = setmetatable, getmetatable
 local ccreate, cstatus, cresume = coroutine.create, coroutine.status, coroutine.resume
 
-
+local start = false
+local lastPull = computer.uptime ()
 local processId = 0
 local processes = {}
 
+--
+-- I should use this, atm im using it for what?, timers?
+-- despite it containing every event being listened on
 local registered = {}
 registered = setmetatable ( registered, {
 	['__index'] = function ( self, key )
@@ -144,7 +148,6 @@ local __event = {
 		if self.__main == nil then self.__main = e end
 		return id
 	end,
-
 	['interval'] = function ( self, time, func )
 		if func == nil then return false, 'event.timer: function was not supplied' end
 
@@ -162,6 +165,7 @@ local __event = {
 			['interval'] = time,
 			['time'] = tonumber( computer.uptime () + time ),
 			['arguments'] = {id},
+
 			['func'] = func,
 			['__thread'] = nil,
 		}
@@ -170,22 +174,66 @@ local __event = {
 
 		return id
 	end,
+	['has'] = function ( self, event, callback )
+		if callback == nil then
+			if self.__registered [event] ~= nil and #self.__registered[event] > 0 then
+				return true
+			else
+				return false
+			end
+		end
+
+		if self.__registered [event] == nil or #self.__registered [event] < 1 then
+			return false
+		end
+
+		for _, object in ipairs ( self.__registered [event] ) do
+			if type(object) == 'table' and object.func == callback then
+				return true
+			end
+		end
+		return false
+	end,
 	['push'] = function ( self, ... )
 		local args = {...}
-		insert ( args, 2, self.id )
-
 		
-		return eventHandler.push ( table.unpack (args) )
+		if args [1] ~= 'event-handler.stop' and self.__registered [ args[1] ] ~= nil and math.ceil (lastPull * 10) / 10 > computer.uptime () then
+			local event = table.remove ( args, 1 )
+			eventHandler.__trigger ( self.id, event, args )
+
+		else
+			insert ( args, 2, self.id )
+			eventHandler.push ( table.unpack (args) )
+		end
+
+		return self
 	end,
 	['pull'] = function ( self, ... )
 		return coroutine.yield ( ... )
 	end,
 	['signal'] = function ( self, to, ... )
 		local args = {...}
-		insert ( args, 2, to )
-
 		if args[#args] ~= self.id then insert ( args, self.id ) end
-		return eventHandler.push ( table.unpack(args) )
+
+		if type(to) == 'string' then
+			local found = false
+			for _, process in pairs ( processes ) do
+				if found == false and process.name == to then
+					to = process.id
+
+					found = true
+				end
+			end
+		end
+
+		if args [1] ~= 'event-handler.stop' and self.__registered [ args[1] ] ~= nil and math.ceil (lastPull * 10) / 10 > computer.uptime () then
+			local event = table.remove ( args, 1 )
+			eventHandler.__trigger ( to, event, args )
+
+		else
+			insert ( args, 2, to )
+			return eventHandler.push ( table.unpack(args) )
+		end
 	end,
 	['destroy'] = function ( self )
 		eventHandler.destroy ( self )
@@ -298,9 +346,11 @@ eventHandler = {
 			--
 
 			local args = {pullSignal (timer.time - computer.uptime())}
+			lastPull = computer.uptime ()
 			local event = remove ( args, 1 )
 
-			log ( 'Caught: ' .. tostring(event) ..','.. table.concat ( args, ', ' ) )
+
+			log ( computer.uptime () .. ': Caught: ' .. tostring(event) ..','.. table.concat ( args, ', ' ) .. ': timer:' .. tostring(timer.id) )
 			if event == 'event-handler.stop' then return args end
 
 			if event == nil and timer.id ~= nil and timer.func ~= nil then
@@ -316,7 +366,7 @@ eventHandler = {
 					eventHandler.__trigger (id, event, args)
 				else
 					for id in pairs ( processes ) do
-						eventHandler.__trigger ( id, event, args )
+						eventHandler.__trigger (id, event, args)
 					end
 				end
 			end
@@ -325,17 +375,19 @@ eventHandler = {
 
 	['__trigger'] = function ( processId, e, args )
 		local __event = processes [processId]
-		if type(__event) ~= 'table' then return end
+		if type(__event) ~= 'table' then return nil, 'process not found' end
 
 		local events = nil
-		if event == '*' then
+		if e == '*' then
+
 			events = __event.__registered
 		else
-			if __event.__registered [e] == nil then return end
+			if __event.__registered [e] == nil then return nil, 'event not found in process' end
 			events = {[e] = __event.__registered [e]}
 		end
-
+		
 		for __event, events in pairs (events) do
+
 			for i, event in pairs (events) do
 				local m = #event.arguments
 
@@ -355,7 +407,12 @@ eventHandler = {
 					end
 
 					if cstatus ( event['__thread'] ) ~= 'dead' then
-						local reason = {cresume ( event ['__thread'], event.owner or __event, table.unpack ( args ) )}
+						local reason = nil
+						if event ['nil'] == true then
+							reason = {cresume ( event ['__thread'] )}
+						else
+							reason = {cresume ( event ['__thread'], event.owner or __event, table.unpack ( args ) )}
+						end
 						local state = remove ( reason, 1 )
 
 						
@@ -401,20 +458,28 @@ eventHandler = {
 										['func'] = function () end,
 										['__thread'] = event['__thread'],
 									} )
+									insert ( registered [__event], event.owner.__registered [__event][#event.owner.__registered [__event]] )
+
 									insert ( event.owner.__registered ['timer'], { 
 										['owner'] = event.owner,
 										['type'] = 'event.object',
 
+										['id'] = math.random (),
+
+										['nil'] = true,
 										['once'] = true,
 										['time'] = time + computer.uptime (),
 										['arguments'] = reason,
 										['func'] = function () end,
 										['__thread'] = event['__thread'],
 									} )
+									insert ( registered ['timer'], event.owner.__registered ['timer'][#event.owner.__registered ['timer']] )
 									
 								else
-									if event.owner.__registered [ reason[1] ] == nil then event.owner.__registered [ reason[1] ] = {} end
-									insert ( event.owner.__registered [ remove (reason,1) ], { 
+									local __event = remove (reason,1)
+									if event.owner.__registered [ __event ] == nil then event.owner.__registered [ __event ] = {} end
+
+									insert ( event.owner.__registered [ __event ], { 
 										['owner'] = event.owner,
 										['type'] = 'event.object',
 
@@ -429,6 +494,7 @@ eventHandler = {
 										end,
 										['__thread'] = event['__thread'],
 									} )
+									insert ( registered [__event], event.owner.__registered [__event][#event.owner.__registered [__event]] )
 								end
 							end
 						end
@@ -446,6 +512,8 @@ eventHandler = {
 				end
 			end
 		end	
+
+		return true
 	end,
 }
 
@@ -488,7 +556,7 @@ sys:on ( 'process.list', function ( _, processId )
 		insert ( o, {
 			['id'] = k,
 			['name'] = processes [k].name
-		})
+		} )
 	end
 
 	eventHandler.push ( 'process.list', processId, system.serialize.pack(o) )
@@ -518,8 +586,10 @@ sys:off ('process.kill'):on ( 'process.kill', function ( event, processId, statu
 
 		local response = event:pull ( 1, 'process.alive' )
 		if response == nil then
-			if processes [processId] == nil and statusId ~= nil then 
-				eventHandler.push ( 'process.killed', statusId, false, 'process not found' )
+			if processes [processId] == nil then
+				if statusId ~= nil then 
+					eventHandler.push ( 'process.killed', statusId, false, 'process not found' )
+				end
 			else
 				processes [processId]:destroy ()
 

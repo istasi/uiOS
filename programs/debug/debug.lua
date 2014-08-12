@@ -1,4 +1,7 @@
-system.desktop:search ( 'debug.window' ):each ( function ( window ) window:remove () end )
+--desktop:search ( 'debug.window' ):each ( function ( window ) window:remove () end )
+--error ( 'i ran' )
+--[[
+
 
 local dragTimer = false
 local ox, oy = nil, nil
@@ -176,3 +179,4 @@ system.event:on ( 'show.other', function ( event )
 end )
 
 window:draw ();
+]]

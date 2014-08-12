@@ -1,4 +1,10 @@
 return function ( self, query )
+	local onlyThis = false
+	if query:match ('^>') then
+		onlyThis = true
+		query = query:gsub ( '^>%s*', '' )
+	end
+
 	if type (self) ~= 'table' or self.type:match ('^ui%.element') == nil then
 		error ( 'ui.element:search (), self is missing, or not of type ui.element' )
 	end
@@ -25,9 +31,11 @@ return function ( self, query )
 			
 		end
 
-		local _o = child:search ( query )
-		for _, child in ipairs ( _o ) do
-			table.insert ( o, child )
+		if onlyThis == false then
+			local _o = child:search ( query )
+			for _, child in ipairs ( _o ) do
+				table.insert ( o, child )
+			end
 		end
 	end
 
