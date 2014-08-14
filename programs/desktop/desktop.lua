@@ -41,11 +41,13 @@ end )
 
 --
 -- Create the system menu
-local menu = desktop:create ('desktop.system.bar', true)
+local menu = desktop:create ('desktop.system.menu', true)
 :attr ({
 	['position'] = 'relative',
 	['x'] = 1,
 	['y'] = 1,
+
+	['z-index'] = 100,
 
 	['height'] = 1,
 
@@ -55,7 +57,7 @@ local menu = desktop:create ('desktop.system.bar', true)
 -- 
 -- Memory usage display
 local mode = 1
-local mem = menu:create ( 'system.bar.memory', true )
+local mem = menu:create ( 'system.menu.memory', true )
 :attr ({
 	['position'] = 'relative',
 	['x'] = desktop:attr('width') - 30,
@@ -92,7 +94,7 @@ end )
 
 --
 -- Add the programs folder to the system menu
-local object = menu:create ( 'system.bar.menu', true )
+local object = menu:create ( 'system.menu.entry', true )
 object:attr ({
 	['width'] = 20,
 	['height'] = 1,
@@ -103,7 +105,7 @@ object:attr ({
 
 local menuClose = function ( ui, event )
 	event:stopPropagation ( true )
-	
+
 	ui:search ( '> menu.object.window' ):each ( function ( ui ) 
 		if ui:attr ('visibility') == 'hidden' then
 			ui:attr ('visibility', 'visible' )
@@ -119,7 +121,7 @@ local menuClose = function ( ui, event )
 	ui:root ():draw ()
 end
 
-object:on('touch', menuClose )
+object:on('touch', menuClose)
 
 
 --
@@ -177,7 +179,7 @@ local programs = {
 	end,
 }
 
-event:on ( 'system.bar.menu.program.add', function ( event, name, file )
+event:on ( 'system.menu.program.add', function ( event, name, file )
 	window:search ( 'program.entry' ):each ( function ( ui ) ui:remove () end )
 
 	programs:add ( name, {name, file} )
@@ -191,6 +193,7 @@ event:on ( 'system.bar.menu.program.add', function ( event, name, file )
 			end
 		end
 
+		local window = window
 		for i, part in ipairs (parts) do
 			local line = window:create ( 'program.entry', true )
 			:attr ({
@@ -206,7 +209,14 @@ event:on ( 'system.bar.menu.program.add', function ( event, name, file )
 			:text ( part )
 				
 			if i == #parts then
-				line:on ( 'touch', function ( ui )
+				line:on ( 'touch', function ( ui, e )
+					e:stopPropagation ( true )
+
+					menu:search ('menu.object.window'):each ( function ( ui )
+						ui:attr ( 'visibility', 'hidden' )
+					end )
+					ui:root ():draw ()
+
 					event:signal ( '[System]', 'program.execute', ui.__file )
 				end )
 				line.__file = file
@@ -224,7 +234,7 @@ event:on ( 'system.bar.menu.program.add', function ( event, name, file )
 					['visibility'] = 'hidden',
 				})
 
-				line:on ('touch', menuClose )
+				line:on ('touch', menuClose)
 			end
 		end
 	end )
@@ -233,7 +243,7 @@ event:on ( 'system.bar.menu.program.add', function ( event, name, file )
 	:draw ()
 end )
 
-event:on ( 'system.bar.menu.program.remove', function ( event, name )
+event:on ( 'system.menu.program.remove', function ( event, name )
 	window:search ( 'program.entry' ):each ( function ( ui ) ui:remove () end )
 
 	programs:remove ( name )
@@ -246,6 +256,7 @@ event:on ( 'system.bar.menu.program.remove', function ( event, name )
 			['vertical-align'] = 'bottom',
 		})
 		:text ( name )
+
 	end )
 
 	if #programs.__keys > 0 then
@@ -262,6 +273,7 @@ event:on ( 'system.bar.menu.program.remove', function ( event, name )
 		:text ( 'No programs added.' )
 	end
 	window:draw ()
+
 end )
 
 for _, entry in ipairs ( filesystem.list ('/programs/' ) ) do
@@ -271,15 +283,13 @@ for _, entry in ipairs ( filesystem.list ('/programs/' ) ) do
 
 		if type(config) == 'table' and config.menu ~= nil then
 			if type(config.menu) == 'string' then
-				event:push ('system.bar.menu.program.add', config.menu, path .. '/' .. config.file, config.name)
+				event:push ('system.menu.program.add', config.menu, path .. '/' .. config.file, config.name)
 			elseif type(config.menu) == 'table' then
-				event:push ('system.bar.menu.program.add', config.menu[1], path .. '/' .. config.menu[2], config.name)
+				event:push ('system.menu.program.add', config.menu[1], path .. '/' .. config.menu[2], config.name)
 			end
 		end
 	end
 end
 
-
-
-desktop:draw ()
+-- Global the desktop, so everyone can use it.
 environment.set ( 'desktop', desktop )

@@ -209,7 +209,7 @@ return function ( self, key )
 
 					if last ~= nil then
 						local _,maxY = calcAlign ( last )
-						offsetY = (self.parent:__computed ('height') / 2) - (maxY / 2) + offsetY
+						offsetY = (self.parent:__computed ('height') / 2) - (maxY / 2) + offsetY - 1
 					end
 				end
 			end

@@ -154,12 +154,12 @@ zone = {
 					element ['height'] = element.using:__computed ('height')
 				end
 
+				element.__zIndex = i
 				if element.relation ~= nil then
 					if type(element.relation) ~= 'table' and element.relation.type ~= 'zone.element' then error ( 'zone.get (), attempted to access invalid zone.element.relation' ) end
 
 					if x >= element.relation.x + element.x - 1 and x <= element.relation.x + element.x + element.width then
 						if y >= elment.relation.y + element.y - 1 and y <= element.relation.y + element.y + element.height then
-							element.__zIndex = i
 							return element
 						end
 					end

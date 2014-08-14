@@ -1,6 +1,13 @@
 {
-	['run-level'] = 'initialize',
-	['auto-run'] = true,
+	{
+		['name'] = '[Desktop]',
+		['run-level'] = 'initialize',
+		['auto-run'] = true,
 
-	['file'] = 'desktop.lua',
+		['file'] = 'desktop.lua',
+	},
+	{
+		['auto-run'] = true,
+		['file'] = 'finalize.lua'
+	}
 }

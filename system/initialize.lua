@@ -17,42 +17,37 @@ do
 		if system.filesystem.exists ('/programs/' .. entry) == true and system.filesystem.exists ('/programs/' .. entry .. '/setup.lua') == true and system.filesystem.isDirectory ('/programs/' .. entry .. '/setup.lua') == false then
 			local config = system.serialize.fromFile ('programs/' .. entry .. '/setup.lua')
 			if type(config) == 'table' then
-				local level = keywords['default']
+				if config [1] == nil then config = {config} end
+				for i, config in pairs(config) do
+					local level = keywords['default']
 
-				if config ['run-level'] ~= nil then
-					if type(config['run-level']) == 'string' then
-						if keywords [config['run-level']] ~= nil then
-							level = keywords [config['run-level']]
+					if config ['run-level'] ~= nil then
+						if type(config['run-level']) == 'string' then
+							if keywords [config['run-level']] ~= nil then
+								level = keywords [config['run-level']]
+							end
+						elseif type(config['run-level']) == 'number' then
+							level = config['run-level']
 						end
-					elseif type(config['run-level']) == 'number' then
-						level = config['run-level']
 					end
+
+					config.path = '/programs/' .. entry
+					if programs [level] == nil then programs [level] = {} end
+					table.insert ( programs [level], config )
+
+					local found = false
+					for _, value in pairs ( keys ) do if value == level then found = true end end
+					if found == false then table.insert ( keys, level ) end
 				end
-
-				config.path = '/programs/' .. entry
-				if programs [level] == nil then programs [level] = {} end
-				table.insert ( programs [level], config )
-
-				local found = false
-				for _, value in pairs ( keys ) do if value == level then found = true end end
-				if found == false then table.insert ( keys, level ) end
 			end
 		end
 	end
 end
 
-table.sort ( keys )
-for i, level in ipairs ( keys ) do
-	for _, config in ipairs ( programs [level] ) do
-		if config ['auto-run'] == true then
-			if config ['file'] ~= nil and system.filesystem.exists (config.path .. config.file) == true then
-				system.event:push ( 'program.execute', config.path .. config.file )
-			end
-		end
-	end
-end
-
-system.event:on ('program.execute', function ( event, file, owner )
+system.event:on ('program.execute', function ( event, file, owner, respondId )
+	if file == nil then return end
+	file = system.filesystem.canonical ( file )
+	
 	if system.filesystem.exists ( file ) == false then 
 		return event:push('error', 'program.execute: file not found (' .. file .. ')') 
 	end
@@ -68,9 +63,32 @@ system.event:on ('program.execute', function ( event, file, owner )
 		return env.event:push ('error', tostring(result) )
 	end
 
-	env.event:on ('main', function () result () end)
+	env.event:on ('main', function ( event )
+		result ()
+
+		-- Should i, once the main function have exited, should i just kill off the process?
+
+		if respondId ~= nil then event:signal ( respondId, 'program.executed' ) end
+	end )
 	env.event:push ('main')
 end )
+
+
+-- Todo: figure a way to delay triggering/pushing programs on different run levels
+-- As a run level may add variables required by another.
+table.sort ( keys )
+for i, level in ipairs ( keys ) do
+	for _, config in ipairs ( programs [level] ) do
+		if config ['auto-run'] == true then
+			if config ['file'] ~= nil and system.filesystem.exists (config.path .. config.file) == true then
+				--error ( config.path .. config.file )
+				system.event:push ( 'program.execute', config.path .. config.file, config.name or config.path .. config.file, system.event.id )
+				system.event:pull ( 0.05, 'program.executed' )
+			end
+		end
+	end
+end
+
 
 --[[
 --

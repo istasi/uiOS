@@ -19,9 +19,6 @@ end
 
 local ui = {}
 
-
-
-
 local enum = {
 	['type'] = 'enum',
 	['__valid'] = {''},
@@ -483,20 +480,41 @@ function element.on ( self, event, callback )
 		_event:on ( 'touch', function ( e, address, x,y, button, who )
 			if _screen.address ~= address then return end
 
-			local zone = nil
+			---[[
+			local zone = _zone.get ( x,y )
+			if zone ~= nil then
+				while zone.values:__computed ('visibility') == 'hidden' do
+					zone = _zone.get ( x,y, zone.__zIndex - 1 )
+
+					if zone == nil then return end
+				end
+
+				zone.values:trigger ( e, x,y, button, who )
+			end
+			--]]
+
+			--[[ old and slightly uglier method to do this
 			repeat
 				local z = nil
-				if zone ~= nil and zone.__zIndex ~= nil then z = zone.__zIndex - 1 end
+				if zone ~= nil and zone.__zIndex ~= nil then 
+					z = zone.__zIndex - 1
+
+					component.invoke ( component.list('gpu', true) (), 'set', 1,2, tostring (z) )
+					if z < 0 then return end
+				end
 
 				zone = _zone.get ( x,y, z )
 				_event.__drag = zone
 
+				if zone == nil then return end
 				if zone ~= nil and zone.values:__computed ('visibility') ~= 'hidden' then
 					zone.values:trigger ( e, x,y, button, who )
 
 					zone = nil
 				end
+
 			until zone == nil 
+			--]]
 		end )
 
 		_event:on ( 'drag', function ( e, address, x,y, button, who )

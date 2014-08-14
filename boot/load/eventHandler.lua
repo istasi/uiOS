@@ -196,7 +196,7 @@ local __event = {
 	end,
 	['push'] = function ( self, ... )
 		local args = {...}
-		
+
 		if args [1] ~= 'event-handler.stop' and self.__registered [ args[1] ] ~= nil and math.ceil (lastPull * 10) / 10 > computer.uptime () then
 			local event = table.remove ( args, 1 )
 			eventHandler.__trigger ( self.id, event, args )
@@ -226,7 +226,16 @@ local __event = {
 			end
 		end
 
-		if args [1] ~= 'event-handler.stop' and self.__registered [ args[1] ] ~= nil and math.ceil (lastPull * 10) / 10 > computer.uptime () then
+		local hasObject = false
+		for _, value in pairs ( args ) do
+			if type(value) == 'table' then hasObject = true end
+		end
+
+		if args[1] == 'desktop.response' then
+		--	error ( tostring(hasObject) )
+		end
+
+		if args [1] ~= 'event-handler.stop' and processes [to] ~= nil and processes[to].__registered [ args[1] ] ~= nil and (math.ceil (lastPull * 10) / 10 > computer.uptime () or hasObject) then
 			local event = table.remove ( args, 1 )
 			eventHandler.__trigger ( to, event, args )
 
@@ -292,10 +301,12 @@ eventHandler = {
 			e:on ( event, callback )
 		end
 
+		--[[
 		if owner ~= nil and type(owner) == 'table' and owner.name == 'event' then
-			if children [owner] == nil then children [owner] = {} end
-			insert ( children [owner], e)
+			if children [owner.id] == nil then children [owner.id] = {} end
+			insert ( children [owner.id], e)
 		end
+		]]
 
 		if name ~= nil and type(name) == 'string' then
 			e.name = name
@@ -307,6 +318,8 @@ eventHandler = {
 	['destroy'] = function ( __event )
 		if children [__event] then
 			for i = 1,#children [__event], -1 do
+				log ( 'Destroying child: ' .. children [__event][i].id )
+
 				children [__event][i]:destroy ()
 				remove ( children [__event], i )
 			end
@@ -323,6 +336,8 @@ eventHandler = {
 			end
 		end
 
+		log ( 'direct destroy: ' .. __event.id )
+		log ( debug.traceback () )
 		processes [ __event.id ] = nil
 		return true
 	end,
@@ -563,10 +578,12 @@ sys:on ( 'process.list', function ( _, processId )
 end )
 sys:off ('process.kill'):on ( 'process.kill', function ( event, processId, statusId, level )
 	if level == nil then level = statusId statusId = nil end
+
 	if level == 9 then
 		if processes [processId] == nil and statusId ~= nil then 
 			eventHandler.push ( 'process.killed', statusId, false, 'process not found' )
 		else
+			log ( 'Level 9 destroy ' .. processId )
 			processes [processId]:destroy ()
 
 			if statusId ~= nil then
@@ -574,41 +591,54 @@ sys:off ('process.kill'):on ( 'process.kill', function ( event, processId, statu
 			end
 		end
 	elseif level == 6 then
-		eventHandler.push ( 'process.kill', processId, level )
+		if processId ~= 1 and processes [processId] ~= nil then
+			log ( 'Telling process ' .. processId .. ' to please die.' )
+			eventHandler.push ( 'process.kill', processId, level )
 
-		if processes [processId] == nil then
-			if statusId ~= nil then
-				eventHandler.push ( 'process.killed', statusId, true )
-			end
-
-			return true
-		end
-
-		local response = event:pull ( 1, 'process.alive' )
-		if response == nil then
+			-- Yeahh this code here is rather useless?
 			if processes [processId] == nil then
-				if statusId ~= nil then 
-					eventHandler.push ( 'process.killed', statusId, false, 'process not found' )
-				end
-			else
-				processes [processId]:destroy ()
-
 				if statusId ~= nil then
 					eventHandler.push ( 'process.killed', statusId, true )
 				end
+
+				return true
 			end
+
+			log ( 'Waiting to hear if it got anything to say for itself.' )
+			local response, id = event:pull ( 1, 'process.alive' )
+			if response == nil or id ~= processId then -- Note, this may cause errors, check here first if wierd shit
+				log ( 'It didnt' )
+				if processes [processId] == nil then
+					log ( 'no response, slaughter it, wait, it disapeared?' )
+					if statusId ~= nil then 
+						eventHandler.push ( 'process.killed', statusId, false, 'process not found' )
+					end
+				else
+					log ( 'We are slaughtering it, ' .. processId )
+					processes [processId]:destroy ()
+
+					if statusId ~= nil then
+						eventHandler.push ( 'process.killed', statusId, true )
+					end
+				end
+			elseif statusId ~= nil then
+				eventHandler.push ( 'process.killed', statusId, false, 'process.alive received' )
+			end
+
 		end
-		
 	else
 		eventHandler.push ( 'process.kill', processId, level )
 
 		i = i + 1
 	end
+
+	log ( 'The end' )
 end )
 
 local count = {
 	['error'] = false,
 	['process.kill'] = false,
+	['main'] = false,
 
 	['n'] = 0,
 }
@@ -623,13 +653,22 @@ sys:on ( 'processes.dead.clean', function ( event )
 			if count [event] ~= false then
 				count.n = count.n + 1
 			end
+
+			if event == 'main' and type(events[1].__thread) == 'thread' and cstatus (events[1].__thread) ~= 'dead' then
+				count.n = count.n + 1
+			end
 		end
 
 		if count.n < 1 then
 			event:push ( 'process.kill', processId, 6 )
+			event:timer ( 1, function ( event ) event:push ( 'processes.dead.clean' ) end )
+
+			return 
 		end
 	end
+
+	event:timer ( 5, function (event) event:push ('processes.dead.clean') end )
 end )
-sys:interval ( 5, function () sys:push ('processes.dead.clean') end )
+sys:timer ( 5, function () sys:push ('processes.dead.clean') end )
 
 return eventHandler

@@ -1,6 +1,6 @@
 {
 	['run-level'] = 9,
-	['auto-run'] = false,
+	['auto-run'] = true,
 
 	['name'] = 'errorHandler',
 	['file'] = 'errorHandler.lua',
